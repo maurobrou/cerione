@@ -45,13 +45,13 @@ const css=document.createElement('style');css.textContent=`
 @media (min-width:960px){.cloudbar{padding-inline:10px;flex-direction:column;align-items:flex-start;gap:4px}}`;
 document.head.appendChild(css);
 const MARK=(document.querySelector('.logo .mark')||{}).outerHTML||'';
-function screen(html,wide){let el=$('auth');if(!el){el=document.createElement('div');el.id='auth';el.className='auth';document.body.appendChild(el)}el.innerHTML=`<div class="box ${wide?'wide':''}"><span class="logo">${MARK}CERIONE</span>${html}</div>`;el.hidden=false;return el}
+function screen(html,wide){let el=$('auth');if(!el){el=document.createElement('div');el.id='auth';el.className='auth';document.body.appendChild(el)}el.classList.remove('adm-on');el.innerHTML=`<div class="box ${wide?'wide':''}"><span class="logo">${MARK}CERIONE</span>${html}</div>`;el.hidden=false;return el}
 function hideScreen(){const el=$('auth');if(el)el.remove()}
 function msg(t,k=''){const m=$('au-msg');if(m){m.className='msg '+k;m.textContent=t;m.hidden=!t}}
 const errTxt=e=>{const m=(e&&(e.message||e.error_description||e))+'';
   if(/Invalid login/i.test(m))return'E-mail ou senha incorretos.';if(/Email not confirmed/i.test(m))return'Confirme seu e-mail pelo link que enviamos antes de entrar.';
   if(/already registered|already exists/i.test(m))return'Este e-mail já tem conta. Use “Entrar”.';if(/Password should be/i.test(m))return'A senha precisa ter pelo menos 6 caracteres.';
-  if(/invalid_code/i.test(m))return'Código de convite não encontrado.';if(/forbidden/i.test(m))return'Seu perfil não permite esta ação.';if(/last_owner/i.test(m))return'O laboratório precisa de pelo menos um Dono.';
+  if(/invalid_code/i.test(m))return'Código de convite não encontrado.';if(/forbidden/i.test(m))return'Seu perfil não permite esta ação.';if(/last_owner/i.test(m))return'O laboratório precisa de pelo menos um Dono.';if(/limit_users/i.test(m))return'O plano do laboratório atingiu o limite de usuários. Fale com o CERIONE para mudar de plano.';
   if(/Failed to fetch|NetworkError/i.test(m))return'Sem conexão com a internet.';return m};
 /* ---------- acesso ---------- */
 function loginScreen(info=''){
@@ -62,7 +62,7 @@ function loginScreen(info=''){
   <button class="lk" id="au-forgot" style="background:none;border:0;color:#8B96A8;text-decoration:underline;cursor:pointer;align-self:flex-start;padding:0">Esqueci minha senha</button>`);
   let mode='in';$('au-form').querySelectorAll('button[type=submit]').forEach(b=>b.addEventListener('click',()=>mode=b.dataset.m));
   $('au-form').addEventListener('submit',async e=>{e.preventDefault();const email=$('au-email').value.trim(),password=$('au-pass').value;msg(mode==='in'?'Entrando…':'Criando conta…');
-    try{if(mode==='in'){const{error}=await C.sb.auth.signInWithPassword({email,password});if(error)throw error;start()}
+    try{try{sessionStorage.removeItem('cl-labmode')}catch(e){}if(mode==='in'){const{error}=await C.sb.auth.signInWithPassword({email,password});if(error)throw error;start()}
     else{const{data,error}=await C.sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});if(error)throw error;if(!data.session){msg('Conta criada. Enviamos um link de confirmação para '+email+'. Confirme e entre aqui.','ok');return}start()}}
     catch(err){msg(errTxt(err),'err')}});
   $('au-forgot').addEventListener('click',async()=>{const email=$('au-email').value.trim();if(!email){msg('Digite seu e-mail acima e clique de novo.','err');return}const{error}=await C.sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});msg(error?errTxt(error):'Enviamos um link para criar uma nova senha em '+email+'.',error?'err':'ok')})}
@@ -76,7 +76,7 @@ function setupScreen(){screen(`<p class="sub" style="margin:0">Conectado como <b
   $('au-new').addEventListener('submit',async e=>{e.preventDefault();msg('Criando…');const{data,error}=await C.sb.rpc('create_lab',{p_name:$('au-lab').value});if(error){msg(errTxt(error),'err');return}localStorage.setItem(LAST,data);start()});
   $('au-join').addEventListener('submit',async e=>{e.preventDefault();msg('Verificando…');const{data,error}=await C.sb.rpc('join_lab',{p_code:$('au-code').value});if(error){msg(errTxt(error),'err');return}localStorage.setItem(LAST,data);start()})}
 function pickScreen(labs){screen(`<h2 style="margin:0">Escolha o laboratório</h2><div class="opt">${C.admin?`<button class="btn primary" data-admin="1"><b>Gestão CERIONE</b>&nbsp;<span style="opacity:.8">· clientes, planos e acessos</span></button>`:''}${labs.map(l=>`<button class="btn" data-lab="${l.id}"><b>${h(l.name)}</b>&nbsp;<span class="mut">· ${h(ROLES[l.role]?.n||l.role)}${l.plan==='teste'?' · ambiente de teste':''}</span></button>`).join('')}</div>${labs.length?'':'<p class="mut" style="margin:0">Você ainda não faz parte de nenhum laboratório.</p>'}<button class="btn" data-newlab="1">+ Criar ou entrar em outro laboratório</button><button class="lk" data-out="1" style="background:none;border:0;color:#8B96A8;text-decoration:underline;cursor:pointer;align-self:flex-start;padding:0">Sair</button>`);
-  $('auth').querySelectorAll('[data-lab]').forEach(b=>b.addEventListener('click',()=>{localStorage.setItem(LAST,b.dataset.lab);openLab(labs.find(l=>l.id===b.dataset.lab))}));
+  $('auth').querySelectorAll('[data-lab]').forEach(b=>b.addEventListener('click',()=>{localStorage.setItem(LAST,b.dataset.lab);try{sessionStorage.setItem(LABMODE,'1')}catch(e){}openLab(labs.find(l=>l.id===b.dataset.lab))}));
   $('auth').querySelector('[data-newlab]').addEventListener('click',setupScreen);const ad=$('auth').querySelector('[data-admin]');if(ad)ad.addEventListener('click',adminScreen)}
 /* ---------- primeiro acesso ---------- */
 function firstRunScreen(){return new Promise(res=>{let local=null;try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d&&Array.isArray(d.orders))local=d}catch(e){}
@@ -127,7 +127,7 @@ async function refreshIfNewer(){if(!C.lab||C.inflight||!$('modal').hidden)return
   S=merge(docs);migrate();applyUsers();Object.keys(AREAS).forEach(a=>C.sent[a]=J(split()[a]));audSnap=audTake();render();setStatus('ok')}
 /* ---------- barra lateral, equipe e acessos ---------- */
 function bar(){const side=document.querySelector('.side');let el=$('cloudbar');if(!el){el=document.createElement('div');el.id='cloudbar';el.className='cloudbar';side.insertBefore(el,side.querySelector('.nav'))}
-  el.innerHTML=`${C.lab.plan==='teste'?'<span class="test-pill">Ambiente de teste</span>':''}<span class="st" id="cl-st"></span><span>${h(C.lab.name)} · ${h(C.user.email)}</span><span style="display:flex;gap:10px;flex-wrap:wrap">${C.role==='dono'?'<button class="lk" data-cl="hist">Histórico</button>':''}<button class="lk" data-cl="labs">Trocar</button><button class="lk" data-cl="out">Sair</button></span>`;
+  el.innerHTML=`${C.lab.plan==='teste'?'<span class="test-pill">Ambiente de teste</span>':''}<span class="st" id="cl-st"></span><span>${h(C.lab.name)} · ${h(C.user.email)}</span><span style="display:flex;gap:10px;flex-wrap:wrap">${C.role==='dono'?'<button class="lk" data-cl="hist">Histórico</button>':''}<button class="lk" data-cl="labs">${C.admin?'Gestão CERIONE':'Trocar'}</button><button class="lk" data-cl="out">Sair</button></span>`;
   setStatus(C.st&&!C.st.can_write?'ro':C.lastOk?'ok':'idle')}
 const roleSel=(id,v)=>`<select id="${id}">${Object.entries(ROLES).map(([k,r])=>`<option value="${k}" ${k===v?'selected':''}>${h(r.n)}</option>`).join('')}</select>`;
 /* substitui a gestão local de usuários (PIN) pela equipe do servidor */
@@ -145,38 +145,16 @@ async function histModal(){const{data,error}=await C.sb.rpc('list_history',{p_la
   openModal(mhead('Histórico no servidor')+`<p class="sub" style="margin:0">Cópia automática de cada área a cada hora de uso, por 90 dias. Voltar a uma cópia substitui aquela área para toda a equipe.</p>
   ${error?`<p class="err">${h(errTxt(error))}</p>`:(data||[]).length?`<div class="alerts">${data.map(x=>`<div class="alert-i" style="cursor:default"><span><b>${new Date(x.saved_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</b> <span class="mut">· ${h(A[x.area]||x.area)} · versão ${x.version}</span></span><button class="btn sm" data-cl="restore" data-h="${x.id}" data-confirm="Confirmar">Voltar a esta cópia</button></div>`).join('')}</div>`:'<p class="mut">Ainda não há cópias. A primeira é feita após uma hora de uso.</p>'}
   <div class="sheet-foot"><span></span><button class="btn" data-act="close">Fechar</button></div>`,true)}
-/* ---------- GESTÃO CERIONE (dono da plataforma) ---------- */
-const PLANOS=[['essencial','Essencial'],['profissional','Profissional'],['premium','Premium'],['teste','Teste interno']];
-const STS=[['trial','Em teste'],['ativo','Ativo'],['atrasado','Pagamento atrasado'],['bloqueado','Bloqueado (só leitura)'],['cancelado','Cancelado (sem acesso)']];
-async function adminScreen(){screen('<p class="sub">Carregando laboratórios…</p>',true);const{data,error}=await C.sb.rpc('admin_list_labs');if(error){screen(`<div class="msg err">${h(errTxt(error))}</div>`,true);return}
-  const L=data||[],cnt=s=>L.filter(l=>l.status===s&&l.plan!=='teste').length,today=new Date().toISOString().slice(0,10),q=(C.aq||'').toLowerCase();
-  const rows=L.filter(l=>!q||(l.name+' '+(l.owner_email||'')).toLowerCase().includes(q));
-  screen(`<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div><h2 style="margin:0">Gestão CERIONE</h2><p class="sub" style="margin:2px 0 0">Laboratórios clientes, planos, situação e acessos. Os dados internos de cada laboratório não aparecem aqui (LGPD).</p></div><div class="row" style="flex:0"><button class="btn" data-ad="back">Abrir um laboratório</button><button class="btn" data-out="1">Sair</button></div></div>
-  <div class="kp"><div><span class="mut">Laboratórios clientes</span><b>${L.filter(l=>l.plan!=='teste').length}</b>${L.some(l=>l.plan==='teste')?`<span class="mut" style="font-size:12px">+ ${L.filter(l=>l.plan==='teste').length} de teste</span>`:''}</div><div><span class="mut">Ativos</span><b>${cnt('ativo')}</b></div><div><span class="mut">Em teste</span><b>${cnt('trial')}</b><span class="mut" style="font-size:12px">${L.filter(l=>l.status==='trial'&&l.trial_end&&l.trial_end<today).length} com teste vencido</span></div><div><span class="mut">Atrasados</span><b>${cnt('atrasado')}</b></div><div><span class="mut">Bloqueados/cancelados</span><b>${cnt('bloqueado')+cnt('cancelado')}</b></div></div>
-  <form id="ad-new" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end;background:#0A0E14;border:1px solid #212B38;border-radius:12px;padding:12px"><div class="field"><label>Novo laboratório</label><input id="ad-name" required placeholder="Nome do laboratório"></div><div class="field"><label>E-mail do dono</label><input id="ad-email" type="email" required placeholder="dono@laboratorio.com"></div><div class="field"><label>Plano</label><select id="ad-plan">${PLANOS.map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></div><div class="field"><label>Dias de teste</label><input id="ad-days" type="number" min="0" value="14"></div><button class="btn primary" type="submit">Criar e convidar</button></form>
-  <div id="au-msg" class="msg" hidden></div>
-  <input id="ad-q" placeholder="Buscar laboratório ou e-mail…" value="${h(C.aq||'')}">
-  <div style="overflow-x:auto"><table><thead><tr><th>Laboratório</th><th>Dono</th><th>Plano</th><th>Situação</th><th>Teste até</th><th>Usuários</th><th>OS</th><th>Último uso</th><th>Observações</th><th></th></tr></thead><tbody>
-  ${rows.map(l=>`<tr><td><b>${h(l.name)}</b><div class="mut" style="font-size:11.5px">desde ${new Date(l.created_at).toLocaleDateString('pt-BR')}${l.support_access?' · suporte liberado':''}</div></td><td>${h(l.owner_email||'—')}${l.pending_invites?`<div class="mut" style="font-size:11.5px">${l.pending_invites} convite(s) pendente(s)</div>`:''}</td>
-  <td><select data-ad-plan="${l.id}">${PLANOS.map(([k,n])=>`<option value="${k}" ${k===l.plan?'selected':''}>${n}</option>`).join('')}</select></td><td><span class="st-pill ${l.status}">${h((STS.find(s=>s[0]===l.status)||[0,l.status])[1])}</span><select data-ad-st="${l.id}" style="margin-top:6px">${STS.map(([k,n])=>`<option value="${k}" ${k===l.status?'selected':''}>${n}</option>`).join('')}</select></td>
-  <td><input type="date" data-ad-te="${l.id}" value="${l.trial_end||''}"></td><td>${l.members}</td><td>${l.os_total}</td><td>${l.last_seen?new Date(l.last_seen).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'<span class="mut">nunca</span>'}</td>
-  <td><input data-ad-notes="${l.id}" value="${h(l.notes||'')}" placeholder="—"></td><td>${l.support_access?`<button class="btn sm" data-ad-open="${l.id}">Abrir (suporte)</button>`:''}</td></tr>`).join('')||'<tr><td colspan="10" class="mut">Nenhum laboratório ainda.</td></tr>'}</tbody></table></div>`,true);
-  const box=$('auth');box.querySelector('[data-ad=back]').addEventListener('click',start);
-  $('ad-q').addEventListener('input',e=>{C.aq=e.target.value;clearTimeout(C.aqt);C.aqt=setTimeout(()=>{adminScreen().then(()=>{const i=$('ad-q');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}})},350)});
-  $('ad-new').addEventListener('submit',async e=>{e.preventDefault();const{error}=await C.sb.rpc('admin_create_lab',{p_name:$('ad-name').value,p_owner_email:$('ad-email').value,p_plan:$('ad-plan').value,p_trial_days:+$('ad-days').value||0});
-    if(error){msg(errTxt(error),'err');return}const em=$('ad-email').value.trim();await adminScreen();msg(`Laboratório criado. Envie ao dono: acesse ${location.origin}, clique em "Criar conta" e use o e-mail ${em}.`,'ok')});
-  const upd=async(id,patch)=>{const l=L.find(x=>x.id===id);const{error}=await C.sb.rpc('admin_update_lab',{p_lab:id,p_status:patch.status??null,p_plan:patch.plan??null,p_trial_end:patch.trial_end??null,p_notes:patch.notes??null});if(error)msg(errTxt(error),'err');else{Object.assign(l,patch);msg(`${l.name}: atualizado`,'ok')}};
-  box.querySelectorAll('[data-ad-st]').forEach(s=>s.addEventListener('change',async()=>{await upd(s.dataset.adSt,{status:s.value});adminScreen()}));
-  box.querySelectorAll('[data-ad-plan]').forEach(s=>s.addEventListener('change',()=>upd(s.dataset.adPlan,{plan:s.value})));
-  box.querySelectorAll('[data-ad-te]').forEach(s=>s.addEventListener('change',()=>upd(s.dataset.adTe,{trial_end:s.value||null})));
-  box.querySelectorAll('[data-ad-notes]').forEach(s=>s.addEventListener('change',()=>upd(s.dataset.adNotes,{notes:s.value})));
-  box.querySelectorAll('[data-ad-open]').forEach(b=>b.addEventListener('click',()=>{const l=L.find(x=>x.id===b.dataset.adOpen);openLab({...l,role:'dono_suporte'})}))}
+/* ---------- GESTÃO CERIONE: painel em admin.js ---------- */
+const LABMODE='cl-labmode';
+function adminScreen(){try{sessionStorage.removeItem(LABMODE)}catch(e){}return window.CERIONE_ADMIN.open()}
+C.ui={MARK,openLab:l=>{try{sessionStorage.setItem(LABMODE,'1')}catch(e){}return openLab(l)},labsFromAdmin:async()=>{const labs=await myLabs();pickScreen(labs)}};
 /* ---------- eventos ---------- */
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-cl],[data-out]');if(!b)return;
   if(b.dataset.confirm&&b.dataset.armed!=='1'){b.dataset.armed='1';const o=b.innerHTML;b.innerHTML=h(b.dataset.confirm);setTimeout(()=>{if(b.isConnected){b.dataset.armed='';b.innerHTML=o}},3500);e.stopPropagation();return}
   const a=b.dataset.cl||'out';e.stopPropagation();
-  if(a==='out'){await push(true);await C.sb.auth.signOut();localStorage.removeItem(LAST);location.reload()}
-  else if(a==='labs'){await push(true);localStorage.removeItem(LAST);location.reload()}
+  if(a==='out'){await push(true);await C.sb.auth.signOut();localStorage.removeItem(LAST);try{sessionStorage.removeItem('cl-labmode')}catch(e){}location.reload()}
+  else if(a==='labs'){await push(true);localStorage.removeItem(LAST);try{sessionStorage.removeItem(LABMODE)}catch(e){}location.reload()}
   else if(a==='hist')histModal();else if(a==='inv-new')invite();
   else if(a==='restore'){const{error}=await C.sb.rpc('restore_history',{p_lab:C.lab.id,p_id:+b.dataset.h});if(error){toast(errTxt(error));return}const docs=await loadDocs();S=merge(docs);migrate();applyUsers();Object.keys(AREAS).forEach(x=>C.sent[x]=J(split()[x]));closeModal();render();toast('Área restaurada da cópia escolhida')}
   else if(a==='rm'){const{error}=await C.sb.rpc('remove_member',{p_lab:C.lab.id,p_user:b.dataset.u});toast(error?errTxt(error):'Pessoa removida do laboratório');await loadMembers();applyUsers();render()}
@@ -191,6 +169,7 @@ async function start(){if(/type=recovery/.test(location.hash))return;const{data:
   try{await C.sb.rpc('claim_invites')}catch(e){}
   try{const{data:adm}=await C.sb.rpc('is_platform_admin');C.admin=!!adm}catch(e){C.admin=false}
   let labs;try{labs=await myLabs()}catch(e){screen(`<div class="msg err">${h(errTxt(e))}</div><button class="btn primary" onclick="location.reload()">Tentar de novo</button>`);return}
+  if(C.admin){let lm=null;try{lm=sessionStorage.getItem(LABMODE)}catch(e){}if(lm!=='1'){adminScreen();return}}
   if(!labs.length&&!C.admin){setupScreen();return}
   const last=localStorage.getItem(LAST),pick=labs.find(l=>l.id===last)||(labs.length===1&&!C.admin?labs[0]:null);if(pick)openLab(pick);else pickScreen(labs)}
 C.boot=function(){if(!window.supabase||!CFG.url){screen('<div class="msg err">Configuração do servidor ausente.</div>');return}

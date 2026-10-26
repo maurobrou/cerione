@@ -8,3 +8,5 @@
   Cache-Control: no-cache
 /cloud.js
   Cache-Control: no-cache
+/admin.js
+  Cache-Control: no-cache
