@@ -14,7 +14,7 @@ const LOCAL=new Set(['users','audit','_imported']);
 const WRITE={dono:Object.keys(AREAS),fin:['producao','clientes','mensagens','financeiro','estoque'],rec:['producao','clientes','mensagens','estoque'],tec:['producao']};
 const COST=['qtd','sal','semTrib','benef','adic','encPct','prodFlag','auxFlag','costOn','precKey'];
 const canW=a=>C.st&&C.st.can_write&&(WRITE[C.role]||[]).includes(a);
-function split(){const out={};Object.keys(AREAS).forEach(a=>out[a]={});
+function split(){const out={};if(!S)return out;Object.keys(AREAS).forEach(a=>out[a]={});
   Object.keys(S).forEach(k=>{if(LOCAL.has(k))return;const a=Object.keys(AREAS).find(x=>AREAS[x].includes(k))||'config';out[a][k]=S[k]});
   out.producao.team=(S.team||[]).map(t=>{const o={};Object.keys(t).forEach(k=>{if(!COST.includes(k))o[k]=t[k]});return o});
   const tc={};(S.team||[]).forEach(t=>{const o={};COST.forEach(k=>{if(t[k]!==undefined)o[k]=t[k]});tc[t.id]=o});out.custos.teamCost=tc;delete out.producao.teamCost;
@@ -109,7 +109,7 @@ async function loadAudit(){const{data}=await C.sb.from('audit_log').select('at,e
 /* ---------- salvamento por área ---------- */
 function setStatus(s){C.status=s;const el=$('cl-st');if(!el)return;const t={ok:'Salvo no servidor'+(C.lastOk?' · '+C.lastOk.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''),saving:'Salvando…',err:'Sem conexão · tentando de novo',conflict:'Atualizado por outra pessoa',ro:'Somente leitura',idle:'Conectado'}[s]||'';el.className='st '+({ok:'ok',saving:'saving',err:'err',conflict:'err',ro:'err'}[s]||'');el.textContent=t}
 function schedule(ms=1200){clearTimeout(C.timer);C.timer=setTimeout(()=>push(),ms)}
-async function push(force){if(C.inflight){C.again=true;return}C.inflight=true;
+async function push(force){if(!C.lab||!S)return;if(C.inflight){C.again=true;return}C.inflight=true;
   try{const parts=split();let any=false;
     for(const a of Object.keys(AREAS)){const j=J(parts[a]);if(!force&&j===C.sent[a])continue;if(!canW(a)){C.sent[a]=j;continue}any=true;setStatus('saving');
       const{data,error}=await C.sb.rpc('save_doc',{p_lab:C.lab.id,p_area:a,p_data:parts[a],p_expected:C.ver[a]??null});if(error)throw error;const r=Array.isArray(data)?data[0]:data;
@@ -121,7 +121,7 @@ async function push(force){if(C.inflight){C.again=true;return}C.inflight=true;
 async function conflict(a){const{data}=await C.sb.from('lab_docs').select('data,version').eq('lab_id',C.lab.id).eq('area',a).single();if(!data)return;
   snapshot('Alteração não salva (conflito com outra pessoa)');const docs=split();docs[a]=data.data;S=merge(docs);migrate();applyUsers();C.ver[a]=data.version;C.sent[a]=J(split()[a]);setStatus('conflict');
   if(typeof closeModal==='function')closeModal();render();toast('Outra pessoa salvou ao mesmo tempo. A tela foi atualizada; confira e refaça a última alteração.')}
-async function refreshIfNewer(){if(!C.lab||C.inflight||!$('modal').hidden)return;const parts=split();if(Object.keys(AREAS).some(a=>J(parts[a])!==C.sent[a]&&canW(a)))return;
+async function refreshIfNewer(){if(!S||!C.lab||C.inflight||!$('modal').hidden)return;const parts=split();if(Object.keys(AREAS).some(a=>J(parts[a])!==C.sent[a]&&canW(a)))return;
   const{data,error}=await C.sb.from('lab_docs').select('area,version').eq('lab_id',C.lab.id);if(error||!data)return;const newer=data.filter(r=>r.version>(C.ver[r.area]||0)).map(r=>r.area);if(!newer.length)return;
   const docs=split();for(const a of newer){const{data:d}=await C.sb.from('lab_docs').select('data,version').eq('lab_id',C.lab.id).eq('area',a).single();if(d){docs[a]=d.data;C.ver[a]=d.version}}
   S=merge(docs);migrate();applyUsers();Object.keys(AREAS).forEach(a=>C.sent[a]=J(split()[a]));audSnap=audTake();render();setStatus('ok')}
