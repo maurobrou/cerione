@@ -1,0 +1,12 @@
+CERIONE · servidor de WhatsApp (Evolution API)
+
+1. Copie esta pasta para a VM da Oracle como ~/cerione-whatsapp
+2. Na VM:  cd ~/cerione-whatsapp && bash instalar.sh
+3. Copie EVOLUTION_URL e EVOLUTION_KEY que aparecem no final para os
+   segredos do Supabase (Edge Functions -> Secrets).
+4. No CERIONE: Configurações -> WhatsApp do laboratório -> Conectar WhatsApp.
+
+Atualizar a Evolution:  cd ~/cerione-whatsapp && sudo docker compose pull && sudo docker compose up -d
+Ver o que está acontecendo:  sudo docker compose logs -f evolution
+Domínio próprio depois:  aponte whatsapp.seudominio.com.br para o IP da VM e rode
+  bash instalar.sh whatsapp.seudominio.com.br   (e troque o EVOLUTION_URL no Supabase)

@@ -1,17 +1,18 @@
 /* CERIONE · camada de nuvem (Supabase): login, laboratórios, dados por área com permissão, convites e gestão da plataforma */
 (function(){
 const CFG=window.CERIONE_CFG||{};
+const APPURL=location.origin+location.pathname.replace(/[^/]*$/,'');window.CERIONE_APPURL=APPURL;
 const C={sb:null,user:null,lab:null,role:null,admin:false,st:null,ver:{},sent:{},inflight:false,timer:null,dirty:false,auditSent:0,status:'idle',lastOk:null,members:[]};
 window.CERIONE_CLOUD=C;
 const $=id=>document.getElementById(id);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LAST='cerione-last-lab';
 /* ---------- áreas: quais dados ficam em cada documento e quem grava ---------- */
-const AREAS={producao:['orders','seq','services','team','stgV'],clientes:['clients'],mensagens:['msgs'],
-  financeiro:['receivables','invoices','invSeq','payables','posted','accounts','cashMoves','bankLines','bankImports','nfse','chart'],
+const AREAS={producao:['orders','seq','services','team','stgV','lateAck'],clientes:['clients'],mensagens:['msgs'],
+  financeiro:['cfoHist','receivables','invoices','invSeq','payables','posted','accounts','cashMoves','bankLines','bankImports','nfse','chart'],
   estoque:['materials','moves','suppliers','nfeIn','nfeMap'],custos:['fixed','equipment','precImport','fichasV','precV','teamCost'],config:['settings','memberTeam','demoAutoV','_rcDismiss']};
-const LOCAL=new Set(['users','audit','_imported']);
-const WRITE={dono:Object.keys(AREAS),fin:['producao','clientes','mensagens','financeiro','estoque'],rec:['producao','clientes','mensagens','estoque'],tec:['producao']};
+const LOCAL=new Set(['users','audit','_imported','chat']);
+const WRITE={dono:Object.keys(AREAS),fin:['producao','clientes','mensagens','financeiro','estoque'],rec:['producao','clientes','mensagens','estoque'],tec:['producao','mensagens']};
 const COST=['qtd','sal','semTrib','benef','adic','encPct','prodFlag','auxFlag','costOn','precKey'];
 const canW=a=>C.st&&C.st.can_write&&(WRITE[C.role]||[]).includes(a);
 function split(){const out={};if(!S)return out;Object.keys(AREAS).forEach(a=>out[a]={});
@@ -60,12 +61,13 @@ function loginScreen(info=''){
   <div class="field"><label for="au-pass">Senha</label><input type="password" id="au-pass" autocomplete="current-password" minlength="6" required></div>
   <div class="row"><button class="btn primary" type="submit" data-m="in">Entrar</button><button class="btn" type="submit" data-m="up">Criar conta</button></div></form>
   <button class="lk" id="au-forgot" style="background:none;border:0;color:#8B96A8;text-decoration:underline;cursor:pointer;align-self:flex-start;padding:0">Esqueci minha senha</button>`);
-  let mode='in';$('au-form').querySelectorAll('button[type=submit]').forEach(b=>b.addEventListener('click',()=>mode=b.dataset.m));
+  const novo=/criar-conta/.test(location.hash);if(novo){const sub=$('auth').querySelector('.sub');if(sub)sub.textContent='Crie sua conta para testar grátis por 14 dias, com todos os recursos. Sem cartão.';const bu=$('au-form').querySelector('[data-m=up]'),bi=$('au-form').querySelector('[data-m=in]');bu.className='btn primary';bi.className='btn';bu.parentNode.insertBefore(bu,bi);$('au-pass').setAttribute('autocomplete','new-password');setTimeout(()=>$('au-email').focus(),50)}
+  let mode=novo?'up':'in';$('au-form').querySelectorAll('button[type=submit]').forEach(b=>b.addEventListener('click',()=>mode=b.dataset.m));
   $('au-form').addEventListener('submit',async e=>{e.preventDefault();const email=$('au-email').value.trim(),password=$('au-pass').value;msg(mode==='in'?'Entrando…':'Criando conta…');
     try{try{sessionStorage.removeItem('cl-labmode')}catch(e){}if(mode==='in'){const{error}=await C.sb.auth.signInWithPassword({email,password});if(error)throw error;start()}
-    else{const{data,error}=await C.sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});if(error)throw error;if(!data.session){msg('Conta criada. Enviamos um link de confirmação para '+email+'. Confirme e entre aqui.','ok');return}start()}}
+    else{const{data,error}=await C.sb.auth.signUp({email,password,options:{emailRedirectTo:APPURL}});if(error)throw error;if(!data.session){msg('Conta criada. Enviamos um link de confirmação para '+email+'. Confirme e entre aqui.','ok');return}start()}}
     catch(err){msg(errTxt(err),'err')}});
-  $('au-forgot').addEventListener('click',async()=>{const email=$('au-email').value.trim();if(!email){msg('Digite seu e-mail acima e clique de novo.','err');return}const{error}=await C.sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});msg(error?errTxt(error):'Enviamos um link para criar uma nova senha em '+email+'.',error?'err':'ok')})}
+  $('au-forgot').addEventListener('click',async()=>{const email=$('au-email').value.trim();if(!email){msg('Digite seu e-mail acima e clique de novo.','err');return}const{error}=await C.sb.auth.resetPasswordForEmail(email,{redirectTo:APPURL});msg(error?errTxt(error):'Enviamos um link para criar uma nova senha em '+email+'.',error?'err':'ok')})}
 function newPassScreen(){screen(`<h2 style="margin:0">Criar nova senha</h2><div id="au-msg" class="msg" hidden></div><form id="au-np"><div class="field"><label for="au-np1">Nova senha</label><input type="password" id="au-np1" minlength="6" required autocomplete="new-password"></div><button class="btn primary" type="submit">Salvar senha</button></form>`);
   $('au-np').addEventListener('submit',async e=>{e.preventDefault();const{error}=await C.sb.auth.updateUser({password:$('au-np1').value});if(error){msg(errTxt(error),'err');return}history.replaceState(null,'',location.pathname);start()})}
 async function myLabs(){const{data,error}=await C.sb.from('lab_members').select('role,labs(id,name,invite_code,status,plan,trial_end)').eq('user_id',C.user.id);if(error)throw error;return(data||[]).filter(x=>x.labs).map(x=>({...x.labs,role:x.role}))}
@@ -94,7 +96,7 @@ async function loadMembers(){const{data}=await C.sb.from('lab_members').select('
 function applyUsers(){const mt=S.memberTeam||{};S.users=C.members.map(m=>({id:m.user_id,name:m.name||m.email||'Usuário',email:m.email,role:m.role,team:mt[(m.email||'').toLowerCase()]||null,active:true,pin:''}));
   if(!S.users.some(u=>u.id===C.user.id))S.users.push({id:C.user.id,name:'Suporte CERIONE',email:C.user.email,role:'dono',active:true,pin:''});CUR=C.user.id}
 async function openLab(lab){C.lab=lab;C.role=lab.role;screen('<p class="sub">Carregando dados do laboratório…</p>');
-  try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:lab.id});C.st=(Array.isArray(st)?st[0]:st)||{status:lab.status,can_write:true};if(C.role==='dono_suporte')C.st={...C.st,can_write:false,support:true};await loadMembers();
+  try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:lab.id});C.st=(Array.isArray(st)?st[0]:st)||{status:lab.status,can_write:true};if(C.role==='dono_suporte')C.st={...C.st,can_write:false,support:true};await loadMembers();try{const{data:fe}=await C.sb.rpc('my_lab_features',{p_lab:lab.id});if(fe){window.CERIONE_FEATURES=Array.isArray(fe.modules)?fe.modules:null;window.CERIONE_PLAN=fe}}catch(e){}try{if(window.waReset)waReset()}catch(e){}
     let docs=await loadDocs();
     if(!Object.keys(docs).length){if(C.role!=='dono'){screen(`<div class="msg">O dono do laboratório ainda não fez o primeiro acesso. Tente de novo mais tarde.</div><button class="btn" data-out="1">Sair</button>`);return}
       const d=await firstRunScreen();S=d||emptyData();if(!S.invoices)S.invoices=[];if(!S.posted)S.posted={fix:[],com:[]};migrate();if(!S.fichasV)importCatalog();if(!d)S.settings.lab=lab.name;delete S.demoAutoV;S.demoAutoV=5;
@@ -137,9 +139,9 @@ function cloudAccess(){const inv=C.invites||[];return`<section class="panel"><di
   ${tbl(['E-mail','Perfil','Profissional da equipe',''],C.members.map(m=>`<tr><td>${h(m.email||m.user_id)}${m.user_id===C.user.id?' <span class="chip">você</span>':''}</td><td>${m.user_id===C.user.id?h(ROLES[m.role]?.n):`<select data-cl-role="${m.user_id}">${Object.entries(ROLES).map(([k,r])=>`<option value="${k}" ${k===m.role?'selected':''}>${h(r.n)}</option>`).join('')}</select>`}</td><td>${m.role==='tec'?`<select data-cl-team="${h((m.email||'').toLowerCase())}"><option value="">— nenhum —</option>${(S.team||[]).filter(t=>t.active!==false).map(t=>`<option value="${t.id}" ${(S.memberTeam||{})[(m.email||'').toLowerCase()]===t.id?'selected':''}>${h(t.name)}</option>`).join('')}</select>`:'<span class="mut">—</span>'}</td><td class="n">${m.user_id===C.user.id?'':`<button class="btn sm ghost" data-cl="rm" data-u="${m.user_id}" data-confirm="Confirmar remoção">Remover</button>`}</td></tr>`))}
   </section><section class="panel"><h2>Suporte CERIONE</h2><label class="checks"><input type="checkbox" data-cl-support="1" ${C.st&&C.st.support_access?'checked':''}> Permitir que o suporte CERIONE veja os dados deste laboratório para ajudar (pode desligar a qualquer momento; fica registrado na auditoria)</label></section>`}
 async function invite(){openModal(mhead('Convidar pessoa')+`<form id="cl-inv" class="grid"><div class="form-grid">${fld('ci-email','E-mail da pessoa',inp('ci-email','','email','required'))}${fld('ci-role','Perfil',roleSel('ci-role','tec'))}${fld('ci-team','Profissional da equipe (técnicos)',`<select id="ci-team"><option value="">— nenhum —</option>${(S.team||[]).filter(t=>t.active!==false).map(t=>`<option value="${t.id}">${h(t.name)}</option>`).join('')}</select>`)}</div>
-  <p class="mut" style="font-size:12.5px;margin:0">Envie à pessoa o endereço ${h(location.origin)}: ela cria a conta com este e-mail e já entra no laboratório.</p><div class="sheet-foot"><span class="err" id="ci-err"></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn primary" type="submit">Convidar</button></div></div></form>`,true);
+  <p class="mut" style="font-size:12.5px;margin:0">Envie à pessoa o endereço ${h(APPURL)}: ela cria a conta com este e-mail e já entra no laboratório.</p><div class="sheet-foot"><span class="err" id="ci-err"></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn primary" type="submit">Convidar</button></div></div></form>`,true);
   $('cl-inv').addEventListener('submit',async e=>{e.preventDefault();e.stopPropagation();const email=$('ci-email').value.trim().toLowerCase(),role=$('ci-role').value,team=$('ci-team').value;const{error}=await C.sb.rpc('invite_member',{p_lab:C.lab.id,p_email:email,p_role:role});
-    if(error){$('ci-err').textContent=errTxt(error);return}if(team){S.memberTeam={...(S.memberTeam||{}),[email]:team};save()}closeModal();render();copyText(`Você foi convidado para o CERIONE (${C.lab.name}).\nAcesse ${location.origin}, clique em "Criar conta" e use o e-mail ${email}.`,'Convite criado · mensagem copiada para enviar')},true)}
+    if(error){$('ci-err').textContent=errTxt(error);return}if(team){S.memberTeam={...(S.memberTeam||{}),[email]:team};save()}closeModal();render();copyText(`Você foi convidado para o CERIONE (${C.lab.name}).\nAcesse ${APPURL}, clique em "Criar conta" e use o e-mail ${email}.`,'Convite criado · mensagem copiada para enviar')},true)}
 /* ---------- histórico ---------- */
 async function histModal(){const{data,error}=await C.sb.rpc('list_history',{p_lab:C.lab.id});const A={producao:'Produção',clientes:'Clientes',mensagens:'Mensagens',financeiro:'Financeiro',estoque:'Estoque',custos:'Custos',config:'Configurações'};
   openModal(mhead('Histórico no servidor')+`<p class="sub" style="margin:0">Cópia automática de cada área a cada hora de uso, por 90 dias. Voltar a uma cópia substitui aquela área para toda a equipe.</p>
@@ -173,6 +175,18 @@ async function start(){if(/type=recovery/.test(location.hash))return;const{data:
   if(!labs.length&&!C.admin){setupScreen();return}
   const last=localStorage.getItem(LAST),pick=labs.find(l=>l.id===last)||(labs.length===1&&!C.admin?labs[0]:null);if(pick)openLab(pick);else pickScreen(labs)}
 C.boot=function(){if(!window.supabase||!CFG.url){screen('<div class="msg err">Configuração do servidor ausente.</div>');return}
+  window.CHAT={remote:true,async list(after){if(!C.lab)return[];const{data,error}=await C.sb.rpc('chat_list',{p_lab:C.lab.id,p_after:after||0});if(error)throw error;return(data||[]).map(m=>({id:+m.id,at:m.at,uid:m.user_id,uname:m.name||(m.email||'').split('@')[0]||'Usuário',text:m.text}))},
+    async send(text){const{error}=await C.sb.rpc('chat_post',{p_lab:C.lab.id,p_text:text});if(error)throw error}};
+  window.CFO_API={online:true,async analyze(snapshot,question){const{data,error}=await C.sb.functions.invoke('cfo',{body:{lab:C.lab.id,snapshot,question}});
+    if(error){let m=error.message||'erro';try{const j=await error.context.json();m=j.error||m}catch(e){}throw new Error(m)}if(!data||!data.text)throw new Error('ai_error');return data.text}};
+  const waCall=async(action,extra)=>{const{data,error}=await C.sb.functions.invoke('whatsapp',{body:{lab:C.lab.id,action,...(extra||{})}});
+    if(error){let m=error.message||'erro',d=null;try{const j=await error.context.json();m=j.error||m;d=j.detail||null}catch(e){}const er=new Error(m);if(d)er.detail=d;throw er}return data||{}};
+  window.WA_API={online:true,
+    async cfg(){const{data,error}=await C.sb.rpc('wa_get',{p_lab:C.lab.id});if(error)throw error;return data||{status:'desconectado'}},
+    status:()=>waCall('status'),connect:()=>waCall('connect'),logout:()=>waCall('logout'),
+    send:m=>waCall('send',m),
+    async setAuto(auto){const{error}=await C.sb.rpc('wa_set_auto',{p_lab:C.lab.id,p_auto:auto});if(error)throw error},
+    async log(){const{data,error}=await C.sb.rpc('wa_log_list',{p_lab:C.lab.id});if(error)throw error;return data||[]}};
   C.sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   window.save=save=function(){try{auditDiff()}catch(e){}if(C.lab){if(C.st&&!C.st.can_write){setStatus('ro');return}setStatus('saving');schedule()}};
   window.cfgAccess=cfgAccess=function(){return cloudAccess()};
