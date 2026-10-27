@@ -18,7 +18,16 @@
    ]
   },
   {
-   "source": "/(index.html|config.js|cloud.js|admin.js)?",
+   "source": "/(index.html|marca.html)?",
+   "headers": [
+    {
+     "key": "Cache-Control",
+     "value": "no-cache"
+    }
+   ]
+  },
+  {
+   "source": "/app/(.*)",
    "headers": [
     {
      "key": "Cache-Control",
