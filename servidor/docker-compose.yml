@@ -1,0 +1,68 @@
+# CERIONE · servidor de WhatsApp (Evolution API) — roda numa VM grátis da Oracle Cloud (Ampere A1, arm64)
+# Não edite as senhas aqui: elas ficam no arquivo .env, criado pelo instalar.sh
+services:
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: always
+    depends_on: [postgres, redis]
+    environment:
+      SERVER_URL: https://${DOMAIN}
+      SERVER_PORT: "8080"
+      AUTHENTICATION_API_KEY: ${EVOLUTION_KEY}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${PG_PASS}@postgres:5432/evolution?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: cerione
+      # guarda só a conexão de cada laboratório; não guarda conversas, contatos nem histórico
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: cerione
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+      CONFIG_SESSION_PHONE_CLIENT: CERIONE
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      QRCODE_LIMIT: "30"
+      QRCODE_COLOR: "#0A0E14"
+      DEL_INSTANCE: "false"
+      LOG_LEVEL: ERROR,WARN,INFO
+      TELEMETRY_ENABLED: "false"
+      LANGUAGE: pt-BR
+    volumes: [evolution_instances:/evolution/instances]
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${PG_PASS}
+      POSTGRES_DB: evolution
+    volumes: [pg_data:/var/lib/postgresql/data]
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
+    volumes: [redis_data:/data]
+  caddy:
+    # HTTPS automático (Let's Encrypt) na frente da Evolution; só as portas 80 e 443 ficam abertas
+    image: caddy:2-alpine
+    restart: always
+    depends_on: [evolution]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+volumes:
+  evolution_instances:
+  pg_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
