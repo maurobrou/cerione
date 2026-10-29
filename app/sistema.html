@@ -878,7 +878,7 @@ const ROLES={dono:{n:'Dono / Admin',d:'Acesso total, usuários, auditoria e dado
  fin:{n:'Financeiro',d:'Caixa, receber, pagar, faturas, fechamento, notas e relatórios. Vê custos sem alterar.',p:['painel','fin','com','cad_v','compras_v','compras','cli','est_v','os_v','prod','rel','valores','preco']},
  rec:{n:'Recepção',d:'Abre e edita OS, cadastra dentistas, mensagens e estoque. Vê valores, não altera preço nem financeiro.',p:['painel','cli','est_v','estoque','os_v','os','prod','rel','valores','compras_v']},
  tec:{n:'Técnico',d:'Vê só as próprias OS e etapas (quando ligado a um profissional da equipe) e conclui as etapas dele. Não vê valores.',p:['os_v','prod','etapa','est_v','rel']}};
-const VIEW_PERM={cfo:'fin',painel:'painel',caixa:'fin',receber:'fin',fechamento:'fin',pagar:'fin',notas:'fin',resultado:'fin',contas:'fin',relatorios:'fin',comissoes:'com',servicos:'cad_v',equipe:'cad_v',config:'admin',audit:'admin',fornecedores:'compras_v',clientes:'cli',mensagens:'cli',estoque:'est_v',trabalhos:'os_v',producao:'prod',rel:'rel'};
+const VIEW_PERM={cfo:'fin',reforma:'fin',painel:'painel',caixa:'fin',receber:'fin',fechamento:'fin',pagar:'fin',notas:'fin',resultado:'fin',contas:'fin',relatorios:'fin',comissoes:'com',servicos:'cad_v',equipe:'cad_v',config:'admin',audit:'admin',fornecedores:'compras_v',clientes:'cli',mensagens:'cli',estoque:'est_v',trabalhos:'os_v',producao:'prod',rel:'rel'};
 const ACT_PERM={'rec-pay':'fin','pay-pay':'fin','pp-open':'fin','fin-undo':'fin','inv-new':'fin','inv-del':'fin','ip-edit':'fin','fc-inv':'fin','fc-all':'fin','fc-edit':'fin','fc-target':'fin','fc-zero':'fin','post-fixed':'fin','post-comm':'fin','dun-copy':'fin','new':'os','ord-edit':'os','ord-cancel':'os','nx-add':'os','adv':'etapa','back':'etapa','cli-form':'cli','demo-gen':'admin','rc-all':'admin','tl-new':'admin','tl-pin':'admin','tl-off':'admin','pin-copy':'admin'};
 const FORM_PERM={invForm:'fin',ipForm:'fin',recForm:'fin',ppForm:'fin',cmForm:'fin',accForm:'fin',reschForm:'fin',nfeForm:'compras',noForm:'os',cliForm:'cli',svcForm:'cad',addFixed:'cad',addEquip:'cad',addTeam:'cad',matForm:'estoque',chAdd:'fin',usForm:'admin'};
 const UKEY='labline-user';
@@ -961,7 +961,7 @@ const MODS_ALL=[
  {id:'clientes',n:'Clientes',ic:'users',d:'Dentistas, condições comerciais e mensagens.',items:[['clientes','Dentistas'],['mensagens','Mensagens']]},
  {id:'fin',n:'Financeiro',ic:'wallet',d:'Caixa, contas a receber e a pagar, fechamento e notas de serviço.',items:[['caixa','Fluxo de caixa'],['fechamento','Fechamento mensal'],['receber','Contas a receber'],['pagar','Contas a pagar'],['notas:saida','Notas fiscais (NFS-e)']]},
  {id:'estoque',n:'Estoque e compras',ic:'box',d:'Materiais, movimentações, notas de compra e fornecedores.',items:[['estoque:materiais','Materiais'],['estoque:movs','Movimentações'],['notas:entrada','Notas de compra (XML)'],['fornecedores','Fornecedores']]},
- {id:'precos',n:'Custos e preços',ic:'tag',d:'Fichas técnicas, custos e o preço certo de cada serviço.',items:[['servicos:servicos','Fichas e preços'],['servicos:maoobra','Mão de obra'],['servicos:equip','Equipamentos'],['servicos:fixos','Custos fixos'],['servicos:resultado','Resultado e equilíbrio']]},
+ {id:'precos',n:'Custos e preços',ic:'tag',d:'Fichas técnicas, custos e o preço certo de cada serviço.',items:[['servicos:servicos','Fichas e preços'],['servicos:maoobra','Mão de obra'],['servicos:equip','Equipamentos'],['servicos:fixos','Custos fixos'],['servicos:resultado','Resultado e equilíbrio'],['reforma','Reforma tributária']]},
  {id:'equipe',n:'Equipe',ic:'team',d:'Profissionais, etapas e comissões.',items:[['equipe','Profissionais'],['comissoes','Comissões']]},
  {id:'gestao',n:'Gestão',ic:'chart',d:'Resultado, rentabilidade e plano de contas.',items:[['resultado','Resultado (DRE)'],['cfo','CFO virtual'],['relatorios','Rentabilidade'],['contas','Plano de contas'],['audit','Auditoria']]},
  {id:'rel',n:'Relatórios',ic:'doc',d:'Todos os relatórios do sistema para imprimir, salvar em PDF ou Excel.',items:[['rel','Relatórios']]},
@@ -3468,6 +3468,65 @@ document.addEventListener('click',async e=>{const t=e.target.closest&&e.target.c
 /* carrega a situação do WhatsApp quando o laboratório abre */
 setTimeout(function waBoot(){if(S&&S.users&&curUser()&&waOn())waLoad();else if(!WA.cfg)setTimeout(waBoot,4000)},1500);
 window.waReset=()=>{WA.cfg=null;WA.log=null;WA.err='';waStop();setTimeout(()=>{if(S&&S.users&&curUser())waLoad()},1500)};
+/* ================= Simulador da reforma tributária (IBS/CBS) ================= */
+/* Usa os custos de cada ficha (costing) e compara o imposto e a margem de hoje com 2027 e 2033
+   em três regimes: Simples (tudo no DAS), Simples híbrido (IBS/CBS fora do DAS) e Lucro Presumido.
+   Estimativas: alíquotas de referência ainda não fixadas pelo Senado; repartição do DAS pela 1ª faixa. */
+const RF_DEF={cbs:8.8,iva:26.5,iss:3,irpj:7.68,folha:20,cred:70,cli:25};
+const RF_SHARE={III:{pc:.156,iss:.335},V:{pc:.1715,iss:.14}};/* parte de PIS+Cofins e de ISS dentro do DAS (1ª faixa) */
+const rfP=()=>{const p={...RF_DEF,...(S.settings.reforma||{})};Object.keys(RF_DEF).forEach(k=>p[k]=Math.max(0,+p[k]||0));return p};
+const RF_SC=[['hoje','Hoje'],['simples','Simples (DAS)'],['hibrido','Simples híbrido'],['presumido','Lucro Presumido']];
+/* decompõe o custo de um serviço em parte fixa e parte proporcional ao preço */
+function rfBase(s,P){const c=costing(s,P),v=P>0?(c.t-c.imp)/P+(pctMode()?c.f/P:0):0;
+  return{c,P,v,Kfix:c.tot-c.t-(pctMode()?c.f:0),I:(c.m||0)+(c.e||0)+(c.lg||0),L:c.l||0}}
+/* imposto = a·P + b ; crédito ao cliente = cc·P ; E = encargo extra fixo */
+function rfTax(B,sc,ano){const R=prec(),p=rfP(),aliq=R.imposto||0,sh=RF_SHARE[R.anexo]||RF_SHARE.III;
+  const t=ano==='2033'?p.iva/100:p.cbs/100,cin=B.I*(p.cred/100)*t/(1+t);
+  if(sc==='hoje')return{a:B.P>0?B.c.imp/B.P:aliq,b:0,cc:0,E:0};
+  if(sc==='simples')return{a:aliq,b:0,cc:aliq*(ano==='2033'?sh.pc+sh.iss:sh.pc),E:0};
+  if(sc==='hibrido'){const out=ano==='2033'?sh.pc+sh.iss:sh.pc;return{a:(aliq*(1-out)+t)/(1+t),b:-cin,cc:t/(1+t),E:0}}
+  /* presumido: IBS/CBS por fora, ISS até 2032, IRPJ/CSLL sobre a receita, INSS patronal sobre a folha */
+  const iss=ano==='2033'?0:p.iss/100;return{a:(t+p.irpj/100)/(1+t)+iss,b:-cin,cc:t/(1+t),E:B.L*p.folha/100}}
+function rfCalc(s,sc,ano){const P=+s.price||0,B=rfBase(s,P),T=rfTax(B,sc,ano),H=rfTax(B,'hoje',ano);
+  const mAt=x=>x*(1-B.v-T.a)-B.Kfix-T.b-T.E,lucro0=P*(1-B.v-H.a)-B.Kfix,marg=mAt(P),den=1-B.v-T.a;
+  const keep=den>0?(B.Kfix+T.b+T.E+lucro0)/den:NaN;
+  /* repasse: clínica com crédito paga o mesmo custo líquido que pagaria no Simples (DAS) */
+  const S0=rfTax(B,'simples',ano),Pr=T.cc<1?P*(1-S0.cc)/(1-T.cc):P;
+  return{P,tax:r2(T.a*P+T.b+T.E),marg:r2(marg),pct:P>0?marg/P*100:0,cred:r2(T.cc*P),net:r2(P-T.cc*P),keep:keep>0?r2(keep):NaN,lucro0:r2(lucro0),Pr:r2(Pr),margR:r2(mAt(Pr))}}
+function rfMix(){const vol=precVolumes(),sv=listOf('services').filter(s=>+s.price>0&&vol[s.id]>0);return{sv,vol}}
+V.reforma=()=>{
+  const p=rfP(),R=prec(),ano=UI.rfAno||'2033',reg=UI.rfReg||'hibrido';
+  const svs=listOf('services').filter(s=>+s.price>0);
+  if(!svs.length)return head('Reforma tributária','Simule o efeito do IBS e da CBS nos seus preços e na margem.')+`<p class="panel empty">Cadastre os serviços com preço e ficha técnica em <b>Custos e preços</b> para simular.</p>`;
+  const {sv,vol}=rfMix();
+  /* resumo mensal pelo mix real dos últimos 90 dias */
+  const cliShare=p.cli/100;const rows=[];['2027','2033'].forEach(y=>RF_SC.forEach(([k,n])=>{if(k==='hoje'&&y==='2033')return;
+    let rec=0,tax=0,mg=0,cr=0,keep=0,mr=0;sv.forEach(s=>{const u=vol[s.id],x=rfCalc(s,k,y);rec+=x.P*u;tax+=x.tax*u;mg+=x.marg*u;cr+=x.cred*u;keep+=(isNaN(x.keep)?x.P:x.keep)*u;mr+=(cliShare*x.margR+(1-cliShare)*x.marg)*u});
+    rows.push({y:k==='hoje'?'':y,k,n,rec,tax,mg,cr,mr,adj:rec?keep/rec-1:0})}));
+  const base=rows[0],cands=rows.filter(r=>r.k!=='hoje'),best=y=>cands.filter(r=>r.y===y).sort((a,b)=>b.mg-a.mg)[0];
+  const resumo=sv.length?`<section class="panel"><h2>Resumo do mês</h2><p class="sub" style="margin:-6px 0 12px">Mix real dos últimos 90 dias: ${sv.length} serviço${sv.length>1?'s':''}, ${fmt(base.rec)} por mês. Mesmo preço de hoje em todos os cenários.</p>
+    ${tbl(['Ano','Regime','#Imposto/mês','#Margem/mês','#Margem %','#Crédito para os dentistas','#Reajuste p/ manter o lucro','#Margem com repasse'],rows.map(r=>`<tr${r.k==='hoje'?' style="font-weight:600"':''}><td>${r.y||'—'}</td><td>${r.n}${r.y&&best(r.y)===r?' <span class="pill ok">melhor margem</span>':''}</td><td class="n mono">${fmt(r.tax)}</td><td class="n mono ${r.mg<0?'neg':''}">${fmt(r.mg)}</td><td class="n mono">${pct(r.rec?r.mg/r.rec*100:0)}</td><td class="n mono">${r.k==='hoje'?'—':fmt(r.cr)}</td><td class="n mono">${r.k==='hoje'?'—':(r.adj>0?'+':'')+pct(r.adj*100)}</td><td class="n mono">${r.k==='hoje'||r.k==='simples'?'—':fmt(r.mr)}</td></tr>`))}
+    <p class="mut" style="font-size:12.5px;margin:10px 0 0">“Crédito para os dentistas” é o imposto que clínicas fora do Simples abatem do próprio imposto. “Margem com repasse” supõe que, para essas clínicas (${pct(p.cli)} da sua receita, ajustável nas premissas), você sobe o preço até o ponto em que o custo líquido delas fica igual ao do Simples, e mantém o preço atual para os demais dentistas.</p></section>`
+    :`<p class="note">Ainda não há trabalhos entregues nos últimos 90 dias para montar o resumo do mês. A tabela por serviço abaixo já funciona.</p>`;
+  const list=svs.map(s=>[s,rfCalc(s,'hoje',ano),rfCalc(s,reg,ano)]).sort((a,b)=>(a[2].pct-a[1].pct)-(b[2].pct-b[1].pct));
+  const tab=tbl(['Serviço','#Preço','#Margem hoje','#Imposto hoje','#Imposto '+ano,'#Margem '+ano,'#Preço p/ manter o lucro','#Crédito do dentista'],list.map(([s,h,x])=>`<tr><td>${esc(s.name)}${vol[s.id]?` <span class="mut" style="font-size:12px">${String(vol[s.id]).replace('.',',')}/mês</span>`:''}</td><td class="n mono">${fmt(x.P)}</td><td class="n mono">${pct(h.pct)}</td><td class="n mono">${fmt(h.tax)}</td><td class="n mono">${fmt(x.tax)}</td><td class="n mono ${x.pct<h.pct-0.5?'neg':''}">${pct(x.pct)}</td><td class="n mono">${isNaN(x.keep)?'—':fmt(x.keep)}${!isNaN(x.keep)&&x.P?` <span class="mut" style="font-size:12px">${x.keep>=x.P?'+':''}${pct((x.keep/x.P-1)*100)}</span>`:''}</td><td class="n mono">${x.cred?fmt(x.cred):'—'}</td></tr>`));
+  const prm=`<details class="panel"${UI.rfOpen?' open':''} id="rf-det"><summary style="cursor:pointer;font-weight:600">Premissas da simulação</summary><div class="form-grid" style="margin-top:12px">
+    ${fld('rf-cbs','CBS em 2027 (%)',inp('rf-cbs',p.cbs,'number','step="0.1" min="0" data-rf="cbs"'))}
+    ${fld('rf-iva','IBS + CBS em 2033 (%)',inp('rf-iva',p.iva,'number','step="0.1" min="0" data-rf="iva"'))}
+    ${fld('rf-iss','ISS do seu município, fora do Simples (%)',inp('rf-iss',p.iss,'number','step="0.5" min="0" max="5" data-rf="iss"'))}
+    ${fld('rf-irpj','IRPJ + CSLL no Presumido (% da receita)',inp('rf-irpj',p.irpj,'number','step="0.01" min="0" data-rf="irpj"'))}
+    ${fld('rf-folha','INSS patronal fora do Simples (% da mão de obra)',inp('rf-folha',p.folha,'number','step="1" min="0" data-rf="folha"'))}
+    ${fld('rf-cred','Compras que geram crédito (%)',inp('rf-cred',p.cred,'number','step="5" min="0" max="100" data-rf="cred"'))}
+    ${fld('rf-cli','Receita de clínicas fora do Simples (%)',inp('rf-cli',p.cli,'number','step="5" min="0" max="100" data-rf="cli"'))}</div>
+    <p class="mut" style="font-size:12.5px;margin:10px 0 0">Imposto de hoje: ${pct((R.imposto||0)*100)}${S.settings.taxAuto?` (Simples, anexo ${R.anexo})`:' (alíquota informada em Configurações)'}. A repartição do DAS usa a 1ª faixa do anexo ${R.anexo==='V'?'V':'III'}. Compras de fornecedores do Simples geram menos crédito: ajuste o percentual de compras com crédito. Se o laboratório já é Lucro Presumido, coloque 0 no INSS patronal.</p>
+    <div class="toolbar" style="margin:10px 0 0"><button class="btn ghost" data-rf-reset="1" type="button">Voltar às premissas padrão</button></div></details>`;
+  return head('Reforma tributária','Quanto o IBS e a CBS mudam o imposto, a margem e o preço de cada trabalho, com os custos das suas fichas.')+
+  `<p class="note"><b>Estimativa.</b> As alíquotas oficiais ainda não foram fixadas e a classificação da prótese (serviço ou produto) pode mudar o resultado. Use para planejar e confirme a decisão de regime com o seu contador.</p>`+
+  prm+resumo+`<section class="panel"><div class="sec-h" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0">Por serviço</h2><div class="toolbar" style="margin:0">${seg('rfAno',[['2027','2027'],['2033','2033 (reforma completa)']])}${seg('rfReg',[['simples','Simples'],['hibrido','Simples híbrido'],['presumido','Presumido']])}</div></div>
+  <p class="sub" style="margin:6px 0 12px">${RF_SC.find(x=>x[0]===reg)[1]} em ${ano}, com o preço atual. Os que mais perdem margem aparecem primeiro. “Preço p/ manter o lucro” é o novo preço cheio (com IBS/CBS) que deixa o mesmo lucro em reais de hoje.</p>${tab}</section>`};
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset&&t.dataset.rf){S.settings.reforma={...(S.settings.reforma||{}),[t.dataset.rf]:+t.value};UI.rfOpen=true;save();render()}});
+document.addEventListener('click',e=>{const t=e.target;if(t.dataset&&t.dataset.rfReset){delete S.settings.reforma;UI.rfOpen=true;save();render();toast('Premissas padrão restauradas')}
+  else if(t.closest&&t.closest('#rf-det>summary'))UI.rfOpen=!document.getElementById('rf-det').open});
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}
