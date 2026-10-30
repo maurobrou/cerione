@@ -2176,6 +2176,7 @@ function renderNewOrder(err=''){
   <div class="field"><span class="lbl">Condições</span><div class="checks" style="padding-top:6px;flex-direction:column;gap:4px"><label><input type="checkbox" id="no-urg" data-d="urgent" ${draft.urgent?'checked':''}> Urgente sem agendamento (+${S.settings.urgency}%)</label><label><input type="checkbox" id="no-remake" data-d="remake" ${draft.remake?'checked':''}> Retrabalho (sem cobrança)</label></div></div></div>
   ${svc.billByStage?stgUI(svc,n,ul):''}${svc.notes?`<p class="note" style="margin:0">${esc(svc.notes)}</p>`:''}
   <div><span class="lbl">${isEl?`Elementos · ${n} selecionado${n===1?'':'s'} (numeração FDI)`:`Dentes envolvidos (opcional) · ${draft.teeth.length} marcado${draft.teeth.length===1?'':'s'}`}</span><div class="odo-wrap" style="margin-top:6px"><div class="odo">${odo(UPPER,false)}${odo(LOWER,true)}</div><div class="odo-legend"><span>Direito do paciente</span><span>Esquerdo do paciente</span></div></div></div>
+  ${moldFields()}
   ${fld('no-notes','Observações',`<textarea id="no-notes" data-d="notes" placeholder="Ex.: prova de estrutura antes da cerâmica">${esc(draft.notes)}</textarea>`)}
   ${(()=>{const ex=draft.extras||[],locked=draft.editId&&S.orders.find(x=>x.id===draft.editId)?.status!=='producao';const sugg=S.services.filter(x=>x.active!==false&&x.id!==svc.id&&ADDON_RX.test(x.name)&&!ex.some(e=>e.service===x.id));
   return`<div><div class="sec-h"><span class="lbl">Itens adicionais na mesma OS${ex.length?` · ${ex.length}`:''}</span><span class="num">${fmt(ex.reduce((a,e)=>a+extraCalc(e,cl).tot,0))}</span></div>
@@ -2199,7 +2200,7 @@ function openOrder(id){
 ${MASK||o.remake?'':costBox(c)}${o.remake?'<p class="note" style="margin:0">Retrabalho: sem cobrança e com valores zerados na produção (receita, custo, margem e comissão).</p>':''}
 ${o.notes?`<p class="note" style="margin:0">${esc(o.notes)}</p>`:''}
   <div><span class="lbl">Andamento</span><div class="tl" style="margin-top:8px">${tl}</div></div>
-  <div class="sheet-foot"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="bench" data-id="${o.id}">Ficha de bancada</button><button class="btn" data-act="qr-label" data-id="${o.id}">Etiqueta QR</button>${featOn('chat')?`<button class="btn" data-chat-cite="${o.id}">Comentar no chat</button>`:''}${o.status!=='cancelado'?`<button class="btn" data-act="ord-edit" data-id="${o.id}">Editar</button>`:''}${o.status!=='cancelado'&&!(inv0&&recsOf(inv0).some(isPaid))?`<button class="btn danger" data-act="ord-cancel" data-id="${o.id}" data-confirm="Confirmar cancelamento">Cancelar trabalho</button>`:''}${o.idx>0&&o.status!=='cancelado'&&!(inv0&&recsOf(inv0).some(isPaid))?`<button class="btn" data-act="back" data-id="${o.id}">← Voltar etapa</button>`:''}</div>
+  <div class="sheet-foot"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="bench" data-id="${o.id}">Ficha de bancada</button>${can('valores')?`<button class="btn" data-ext="${o.id}">Extrato para o dentista</button>`:''}<button class="btn" data-act="qr-label" data-id="${o.id}">Etiqueta QR</button>${featOn('chat')?`<button class="btn" data-chat-cite="${o.id}">Comentar no chat</button>`:''}${o.status!=='cancelado'?`<button class="btn" data-act="ord-edit" data-id="${o.id}">Editar</button>`:''}${o.status!=='cancelado'&&!(inv0&&recsOf(inv0).some(isPaid))?`<button class="btn danger" data-act="ord-cancel" data-id="${o.id}" data-confirm="Confirmar cancelamento">Cancelar trabalho</button>`:''}${o.idx>0&&o.status!=='cancelado'&&!(inv0&&recsOf(inv0).some(isPaid))?`<button class="btn" data-act="back" data-id="${o.id}">← Voltar etapa</button>`:''}</div>
   ${st?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="lbl">${SN[st]} por</span>${techSelect(o,st)}<button class="btn primary" data-act="adv" data-id="${o.id}">Concluir ${SN[st]}</button></div>`:`<span class="pill done">${o.status==='cancelado'?'Trabalho cancelado':'Trabalho entregue'}</span>`}</div>`);
 }
 
@@ -2789,11 +2790,11 @@ V.mensagens=()=>{
 };
 
 /* ================= Ações ================= */
-function editOrder(id){const o=S.orders.find(x=>x.id===id);if(o.parent){openOrder(o.parent);return}draft={editId:id,extras:kidsOf(o).filter(k=>k.status!=='cancelado'&&!k.billStage).map(k=>({service:k.service,qty:q(k),priceTxt:String(k.price)})),lockSvc:o.idx>0,teeth:[...o.teeth],client:o.client,service:o.service,shade:o.shade,due:o.due,patient:o.patient||'',notes:o.notes||'',remake:!!o.remake,urgent:!!o.urgent,qty:q(o),priceTxt:String(o.price),discTxt:o.discAmt?String(o.discAmt):''};stageEditInit(o);renderNewOrder()}
+function editOrder(id){const o=S.orders.find(x=>x.id===id);if(o.parent){openOrder(o.parent);return}draft={editId:id,extras:kidsOf(o).filter(k=>k.status!=='cancelado'&&!k.billStage).map(k=>({service:k.service,qty:q(k),priceTxt:String(k.price)})),lockSvc:o.idx>0,teeth:[...o.teeth],client:o.client,service:o.service,shade:o.shade,due:o.due,patient:o.patient||'',notes:o.notes||'',...moldOf(o),remake:!!o.remake,urgent:!!o.urgent,qty:q(o),priceTxt:String(o.price),discTxt:o.discAmt?String(o.discAmt):''};stageEditInit(o);renderNewOrder()}
 function updateOrder(){
   const o=S.orders.find(x=>x.id===draft.editId),{svc,cl,n,price}=draftCalc();
   const matChanged=o.service!==svc.id||q(o)!==n,oldDue=o.due;
-  Object.assign(o,{client:cl.id,service:svc.id,teeth:[...draft.teeth].sort((a,b)=>a-b),qty:n,shade:draft.shade,patient:draft.patient.trim(),due:draft.due||o.due,price,remake:draft.remake,urgent:draft.urgent,notes:draft.notes.trim()});{const dv=r2(Math.min(+draft.discTxt||0,gross(o)));if(dv>0){if(dv!==o.discAmt)o.discReason=o.discReason||'Desconto na OS';o.discAmt=dv}else{delete o.discAmt;delete o.discReason}}
+  Object.assign(o,{client:cl.id,service:svc.id,teeth:[...draft.teeth].sort((a,b)=>a-b),qty:n,shade:draft.shade,patient:draft.patient.trim(),due:draft.due||o.due,price,remake:draft.remake,urgent:draft.urgent,notes:draft.notes.trim()});MOLD.forEach(([k])=>{const v=String(draft[k]||'').trim();if(v)o[k]=v;else delete o[k]});{const dv=r2(Math.min(+draft.discTxt||0,gross(o)));if(dv>0){if(dv!==o.discAmt)o.discReason=o.discReason||'Desconto na OS';o.discAmt=dv}else{delete o.discAmt;delete o.discReason}}
   if(matChanged){S.moves=S.moves.filter(m=>!(m.type==='saida'&&m.ref==='OS '+o.num&&!m.kid));svc.bom.forEach(b=>S.moves.push({id:uid('mv'),mat:b.mat,type:'saida',qty:r2(b.qty*n),date:o.created,ref:'OS '+o.num,cost:matOf(b.mat).cost}));o.matCost=r2(matCostSvc(svc)*n);o.history.forEach(h=>h.elements=n)}
   if(o.status==='producao'){const old=kidsOf(o).filter(k=>!k.billStage).map(k=>k.id);S.orders=S.orders.filter(x=>!old.includes(x.id));S.moves=S.moves.filter(m=>!old.includes(m.kid));makeKids(o)}else kidsOf(o).forEach(k=>{k.patient=o.patient;k.client=o.client});
   syncStageKids(o,svc);kidsOf(o).forEach(k=>k.due=o.due);
@@ -2826,7 +2827,7 @@ function createOrder(){
   const{svc,cl,n,price}=draftCalc(),num=S.seq++;
   const mc=r2(matCostSvc(svc)*n);
   svc.bom.forEach(b=>S.moves.push({id:uid('mv'),mat:b.mat,type:'saida',qty:r2(b.qty*n),date:addDays(0),ref:'OS '+num,cost:matOf(b.mat).cost}));
-  const o={id:uid('o'),num,client:cl.id,service:svc.id,teeth:[...draft.teeth].sort((a,b)=>a-b),qty:n,shade:draft.shade,patient:draft.patient.trim(),created:addDays(0),due:draft.due||addDays(7),idx:0,status:'producao',delivered:null,price,remake:draft.remake,urgent:draft.urgent,matCost:mc,assign:{},history:[],notes:draft.notes.trim(),...(+draft.discTxt>0?{discAmt:r2(Math.min(+draft.discTxt,price*n)),discReason:'Desconto na OS'}:{})};
+  const o={id:uid('o'),num,client:cl.id,service:svc.id,teeth:[...draft.teeth].sort((a,b)=>a-b),qty:n,shade:draft.shade,patient:draft.patient.trim(),created:addDays(0),due:draft.due||addDays(7),idx:0,status:'producao',delivered:null,price,remake:draft.remake,urgent:draft.urgent,matCost:mc,assign:{},history:[],notes:draft.notes.trim(),...moldOf(draft),...(+draft.discTxt>0?{discAmt:r2(Math.min(+draft.discTxt,price*n)),discReason:'Desconto na OS'}:{})};
   S.orders.push(o);makeKids(o);stageKids(o,svc);msgOrder('novo',o);return o;
 }
 function makeKids(o){const cl=cliOf(o.client);(draft.extras||[]).forEach((e,i)=>{const x=extraCalc(e,cl);if(!x.n||!x.s.id)return;const kid={id:uid('o'),num:o.num,parent:o.id,client:o.client,service:x.s.id,teeth:[],qty:x.n,shade:'',patient:o.patient,created:o.created,due:o.due,idx:0,status:o.status==='producao'?'acompanha':o.status,delivered:o.delivered,price:x.price,remake:o.remake,urgent:false,matCost:r2(matCostSvc(x.s)*x.n),assign:{},history:[],notes:''};
@@ -3527,6 +3528,63 @@ V.reforma=()=>{
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset&&t.dataset.rf){S.settings.reforma={...(S.settings.reforma||{}),[t.dataset.rf]:+t.value};UI.rfOpen=true;save();render()}});
 document.addEventListener('click',e=>{const t=e.target;if(t.dataset&&t.dataset.rfReset){delete S.settings.reforma;UI.rfOpen=true;save();render();toast('Premissas padrão restauradas')}
   else if(t.closest&&t.closest('#rf-det>summary'))UI.rfOpen=!document.getElementById('rf-det').open});
+/* ================= Extrato da OS para o dentista (PDF) + dados de moldagem da OS ================= */
+const MOLD=[['scale','Escala'],['antag','Antagonista'],['model','Modelo'],['matForn','Mat. fornecido'],['matDev','Mat. devolvido'],['boxNo','Caixa']];
+const moldOf=x=>Object.fromEntries(MOLD.map(([k])=>[k,String((x&&x[k])||'').trim()]).filter(([,v])=>v));
+function moldFields(){const d=draft||{};return`<details class="field" style="grid-column:1/-1"${MOLD.some(([k])=>d[k])?' open':''}><summary style="cursor:pointer;font-weight:600;font-size:13px">Dados da moldagem (opcional)</summary>
+  <div class="form-grid" style="margin-top:10px">${MOLD.map(([k,n])=>fld('no-'+k,n,inp('no-'+k,d[k]||'','text',`data-d="${k}" placeholder="${{scale:'Ex.: VITA Classical',antag:'Ex.: modelo antagonista',model:'Ex.: gesso tipo IV',matForn:'Ex.: análogo, transferente',matDev:'Ex.: moldeira',boxNo:'Ex.: 12'}[k]}"`))).join('')}</div></details>`}
+/* Code 128-B (código de barras do número da OS) */
+const C128=['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+function code128(s){const v=[...String(s)].map(c=>c.charCodeAt(0)-32).filter(x=>x>=0&&x<95);let sum=104;v.forEach((x,i)=>sum+=x*(i+1));return[104,...v,sum%103,106].map(i=>C128[i]).join('')}
+function barsDraw(P,s,x,y,w,h){const pat=code128(s),mods=[...pat].reduce((a,c)=>a+ +c,0)+20,u=w/mods;let cx=x+10*u;[...pat].forEach((c,i)=>{const bw=+c*u;if(i%2===0)P.rect(cx,y,bw+.02,h,[0,0,0]);cx+=bw})}
+/* saldo do dentista: parcelas em aberto + entregues ainda não faturados */
+function cliDebt(cid){const rec=S.receivables.filter(r=>r.client===cid&&!isPaid(r)).reduce((a,r)=>a+(+r.amount||0),0);
+  const unb=S.orders.filter(o=>o.client===cid&&!o.parent&&o.status==='entregue'&&!invForOrder(o.id)).reduce((a,o)=>a+osTotal(o),0);return r2(rec+unb)}
+function extratoDraw(P,o){const M=P.M,W=P.PW-2*M,ink=[20,24,28],mut=[90,98,104],lin=[40,44,48],red=[214,48,64],teal=[11,122,117],st=S.settings;
+  const cl=cliOf(o.client),svc=svcOf(o),kids=kidsOf(o).filter(k=>k.status!=='cancelado'),tot=osTotal(o);
+  const box=(x,y,w,h,c=lin,t=.7)=>{P.rect(x,y,w,t,c);P.rect(x,y+h-t,w,t,c);P.rect(x,y,t,h,c);P.rect(x+w-t,y,t,h,c)};
+  const T=(s,x,y,sz=8.5,o2={})=>P.text(s,x,y,sz,{b:1,c:ink,...o2});
+  let y=M;
+  /* cabeçalho */
+  T(st.lab||'Laboratório',M,y+30,15);
+  const sub=[st.doc&&('CNPJ '+st.doc),st.phone,[st.city,st.uf].filter(Boolean).join(' - ')].filter(Boolean).join(' · ');if(sub)P.text(sub,M,y+43,7.5,{c:mut});
+  T('Extrato Individual',M+W,y+12,12,{align:'right'});T(String(o.num),M+W,y+33,20,{align:'right'});barsDraw(P,String(o.num),M+W-150,y+39,150,24);
+  y+=72;
+  /* dentista e paciente | datas */
+  const rw=170,lw=W-rw;box(M,y,lw,58);box(M+lw,y,rw,58);
+  const addr=[[cl.street,cl.number].filter(Boolean).join(' - '),cl.district,[cl.city,cl.uf].filter(Boolean).join(' ')].filter(Boolean).join(' ');
+  T('Cliente: '+(cl.name||'—'),M+6,y+12);if(cl.phone)T(cl.phone,M+lw-8,y+12,8.5,{align:'right'});
+  T('Clínica: '+(cl.clinic||''),M+6,y+24);T('Ficha: '+o.num+(o.patient?'  Paciente: '+o.patient:''),M+6,y+36);T('Endereço: '+addr,M+6,y+48);
+  T('Entrada: '+dmy(o.created),M+lw+8,y+16);T('Prevista: '+dmy(o.due),M+lw+8,y+30);T('Finalizado: '+(o.delivered?dmy(o.delivered):'—'),M+lw+8,y+44);
+  y+=66;
+  /* itens */
+  const C=[{k:'Qtd.',w:38,a:'center'},{k:'Dentes',w:92,a:'center'},{k:'Elem.',w:36,a:'center'},{k:'Descrição (Serviços)',w:W-38-92-36-62-34-72,a:'left'},{k:'Unitário',w:62,a:'right'},{k:'%',w:34,a:'right'},{k:'Total',w:72,a:'right'}];
+  const cellX=(i,a)=>{let x=M;for(let j=0;j<i;j++)x+=C[j].w;return a==='right'?x+C[i].w-4:a==='center'?x+C[i].w/2:x+4};
+  C.forEach((c,i)=>T(c.k,cellX(i,c.a),y+8,8,{align:c.a}));y+=12;
+  const rows=[o,...kids].map(x=>{const g=gross(x),d=+x.discAmt||0,isEl=(x.teeth||[]).length;return[String(q(x)),isEl?teethTxt(x):'',isEl?String(x.teeth.length):'',(x===o?svc.name:svcOf(x).name)+(x.remake?' (retrabalho)':''),fmt(x.price||0).replace(' ',' '),pct(g?d/g*100:0).replace('%',''),fmt(total(x))]});
+  rows.forEach(r=>{const lines=pdfWrap(pdfTx(r[3]),C[3].w-8,8.5,1),h=Math.max(14,lines.length*10+4);
+    let x=M;C.forEach(c=>{box(x,y,c.w,h,lin,.6);x+=c.w});
+    r.forEach((v,i)=>{if(i===3)lines.forEach((l,j)=>T(l,cellX(3,'left'),y+10+j*10));else T(pdfWrap(pdfTx(v),C[i].w-6,8.5,1)[0],cellX(i,C[i].a),y+10,8.5,{align:C[i].a})});y+=h});
+  T('Subtotal '+fmt(tot),M+W,y+11,9,{align:'right'});y+=22;P.line(M,y-6,M+W,[220,224,227]);
+  /* dados à esquerda */
+  const yL=y;let ly=y+8;const lab=(k,v)=>{T(k+':',M,ly,9);if(v)P.text(v,M+pdfW(k+': ',9,1),ly,9,{c:ink});ly+=13};
+  const md=moldOf(o);lab('Escala',md.scale||'');lab('Cor',o.shade||'');lab('Antagonista',md.antag||'');lab('Modelo',md.model||'');lab('Mat. Forne.',md.matForn||'');lab('Mat. Devol.',md.matDev||'');lab('Caixa',md.boxNo||'');
+  if(o.notes){T('OBS:',M,ly+2,9,{c:red});pdfWrap(pdfTx(o.notes),140,9,1).slice(0,6).forEach((l,i)=>T(l,M,ly+15+i*12,9,{c:red}))}
+  /* odontograma */
+  const gx=M+148,gw=W-148-196,tw=gw/16,top=[18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28],bot=[48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38],sel=new Set([o,...kids].flatMap(x=>x.teeth||[]).map(Number));
+  const row=(L,yy)=>L.forEach((t,i)=>{const x=gx+i*tw;if(sel.has(t))P.rect(x+1,yy-9,tw-2,13,teal);P.text(String(t),x+tw/2,yy,7.5,{b:1,align:'center',c:sel.has(t)?[255,255,255]:ink})});
+  row(top,y+20);P.line(gx,y+26,gx+gw,ink,.8);P.rect(gx+gw/2-.4,y+8,.8,36,ink);row(bot,y+40);
+  pdfWrap(sel.size?'Dentes destacados: elementos deste trabalho.':'Trabalho sem elementos marcados no odontograma.',gw,8,1).forEach((l,i)=>T(l,gx,y+58+i*10,8,{c:mut}));
+  /* totais à direita */
+  const rx=M+W-184;P.rect(rx,y+2,184,24,red);T('Total Pedido: '+fmt(tot),rx+92,y+18,11,{align:'center',c:[255,255,255]});
+  const debt=cliDebt(o.client),incl=o.status==='entregue'&&!invForOrder(o.id)||!!invForOrder(o.id),atual=r2(debt+(incl?0:tot)),ant=r2(atual-tot);
+  const neg=v=>(v>0?'-':'')+fmt(Math.abs(v));T('Saldo anterior: '+neg(ant),rx,y+40,9);T('Saldo atual: '+neg(atual),rx,y+54,9);
+  const lp=S.receivables.filter(r=>r.client===o.client&&isPaid(r)&&r.paidAt).sort((a,b)=>b.paidAt.localeCompare(a.paidAt))[0];
+  if(lp){T('Informativo do último pagamento:',rx,y+70,7.5);T(dm(lp.paidAt)+' '+fmt(recVal(lp)),rx,y+81,7.5)}
+  P.line(rx,y+112,rx+184,ink,.7);P.text('Recebi(emos) o(s) trabalho(s) acima',rx+184,y+122,7,{align:'right',c:mut});
+  P.y=Math.max(ly+90,y+140)}
+async function extratoPdf(o){let b;try{const P=pdfMake(false);extratoDraw(P,o);b=P.blob(`${S.settings.lab||'CERIONE'} · Extrato da OS ${o.num} · emitido em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar o extrato');return}await relSave(`extrato-os-${o.num}.pdf`,b,'application/pdf')}
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-ext]');if(!t)return;const o=find('orders',t.dataset.ext);if(o)extratoPdf(o.parent?find('orders',o.parent)||o:o)});
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}
