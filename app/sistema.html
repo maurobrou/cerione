@@ -3585,6 +3585,33 @@ function extratoDraw(P,o){const M=P.M,W=P.PW-2*M,ink=[20,24,28],mut=[90,98,104],
   P.y=Math.max(ly+90,y+140)}
 async function extratoPdf(o){let b;try{const P=pdfMake(false);extratoDraw(P,o);b=P.blob(`${S.settings.lab||'CERIONE'} · Extrato da OS ${o.num} · emitido em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar o extrato');return}await relSave(`extrato-os-${o.num}.pdf`,b,'application/pdf')}
 document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-ext]');if(!t)return;const o=find('orders',t.dataset.ext);if(o)extratoPdf(o.parent?find('orders',o.parent)||o:o)});
+/* ================= Relatórios de produção: indicadores do mês e analítico por tipo de peça ================= */
+{const roots=()=>S.orders.filter(o=>!o.parent&&mine(o));
+ const dly=(a,b)=>Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/864e5);
+ const idx=REPORTS.findIndex(r=>r.id==='retrab')+1;
+ REPORTS.splice(idx,0,
+ {id:'indprod',g:'Produção',n:'Indicadores de produção',d:'Por mês: trabalhos iniciados, finalizados, retrabalhos, cancelados, entregas no prazo, tempo médio e valor entregue.',f:['cli','svc'],
+  run(F){const ok=o=>(!F.cli||o.client===F.cli)&&(!F.svc||o.service===F.svc),R=roots().filter(ok),ms=monthsIn(F);
+   const rows=ms.map(m=>{const ini=R.filter(o=>(o.created||'').slice(0,7)===m&&inP(o.created,F)),fin=R.filter(o=>o.status==='entregue'&&(o.delivered||'').slice(0,7)===m&&inP(o.delivered,F)),
+     ret=ini.filter(o=>o.remake),can=ini.filter(o=>o.status==='cancelado'),prz=fin.filter(o=>o.due&&o.delivered<=o.due),lt=fin.filter(o=>o.created&&o.delivered);
+     return[monthLabel(m),ini.length,r2(ini.reduce((a,o)=>a+q(o),0)),fin.length,r2(fin.reduce((a,o)=>a+q(o),0)),ret.length,ini.length?ret.length/ini.length*100:0,can.length,fin.length?prz.length/fin.length*100:0,lt.length?r2(lt.reduce((a,o)=>a+dly(o.created,o.delivered),0)/lt.length):0,r2(fin.reduce((a,o)=>a+osTotal(o),0))]});
+   const T=i=>rows.reduce((a,r)=>a+(+r[i]||0),0),ini=T(1),fin=T(3),ret=T(5),prod=R.filter(o=>o.status==='producao').length;
+   const finAll=R.filter(o=>o.status==='entregue'&&inP(o.delivered,F)),prz=finAll.filter(o=>o.due&&o.delivered<=o.due).length;
+   return{cols:[['Mês','t'],['Iniciados (OS)','n'],['Elementos iniciados','n'],['Finalizados (OS)','n'],['Elementos finalizados','n'],['Retrabalhos','n'],['% retrabalho','p'],['Cancelados','n'],['% no prazo','p'],['Dias médios até entrega','n'],['Valor entregue','m']],rows,tot:{1:1,2:1,3:1,4:1,5:1,7:1,10:1},
+    kpi:[['Iniciados',ini+' OS'],['Finalizados',fin+' OS'],['Retrabalhos',ret+' ('+pct(ini?ret/ini*100:0)+')'],['Entregues no prazo',pct(finAll.length?prz/finAll.length*100:0)],['Em produção hoje',prod],['Valor entregue',fmt(T(10))]]}}},
+ {id:'analit',g:'Produção',n:'Produção analítica por tipo de peça',d:'Peças produzidas por serviço e categoria, com retrabalhos, valor bruto, descontos, valor final, preço médio, custo de material, margem e participação.',f:['cli','svc'],o:['Agrupar por',[['svc','Serviço (tipo de peça)'],['cat','Categoria']]],
+  run(F){const g=F.opt||'svc',m={};
+   S.orders.forEach(x=>{if(x.status!=='entregue')return;const root=x.parent?find('orders',x.parent):x;if(!root||!mine(root))return;const dt=x.delivered||root.delivered;if(!inP(dt,F))return;
+     if(F.cli&&root.client!==F.cli)return;const sv=x.billStage?svcOf(root):svcOf(x);if(F.svc&&sv.id!==F.svc&&svcOf(root).id!==F.svc)return;
+     const k=g==='cat'?(sv.cat||'Sem categoria'):sv.id,e=m[k]=m[k]||{n:g==='cat'?(sv.cat||'Sem categoria'):sv.name,cat:sv.cat||'',un:sv.unit||'',os:new Set(),pc:0,rt:0,gr:0,ds:0,vl:0,mat:0,mg:0};
+     if(!x.billStage){if(x.remake)e.rt+=q(x);else e.pc+=q(x);e.os.add(root.id)}
+     e.gr+=x.remake?0:gross(x);e.ds+=+x.discAmt||0;e.vl+=total(x);e.mat+=x.remake?0:(+x.matCost||0);try{e.mg+=orderCost(x).margin}catch(er){}});
+   const L=Object.values(m).sort((a,b)=>b.vl-a.vl),TV=L.reduce((a,e)=>a+e.vl,0),TP=L.reduce((a,e)=>a+e.pc,0),TR=L.reduce((a,e)=>a+e.rt,0);
+   const cols=g==='cat'?[['Categoria','t']]:[['Serviço (tipo de peça)','t'],['Categoria','t'],['Unidade','t']];
+   return{cols:[...cols,['OS','n'],['Peças produzidas','n'],['Retrab. (peças)','n'],['% retrabalho','p'],['Valor bruto','m'],['Descontos','m'],['Valor final','m'],['Preço médio por peça','m'],['Custo de material','m'],['Margem','m'],['Margem %','p'],['% do faturamento','p']],
+    rows:L.map(e=>[...(g==='cat'?[e.n]:[e.n,e.cat,e.un]),e.os.size,r2(e.pc),r2(e.rt),e.pc+e.rt?e.rt/(e.pc+e.rt)*100:0,r2(e.gr),r2(e.ds),r2(e.vl),e.pc?r2(e.vl/e.pc):0,r2(e.mat),r2(e.mg),e.vl?e.mg/e.vl*100:0,TV?e.vl/TV*100:0]),
+    tot:Object.fromEntries((g==='cat'?[1,2,3,5,6,7,9,10]:[3,4,5,7,8,9,11,12]).map(i=>[i,1])),
+    kpi:[['Peças produzidas',TP.toLocaleString('pt-BR')],['Retrabalhos',TR.toLocaleString('pt-BR')+' ('+pct(TP+TR?TR/(TP+TR)*100:0)+')'],['Valor final',fmt(TV)],['Preço médio por peça',fmt(TP?TV/TP:0)],['Tipos de peça',L.length]]}}});}
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}
