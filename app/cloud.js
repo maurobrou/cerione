@@ -55,22 +55,119 @@ const errTxt=e=>{const m=(e&&(e.message||e.error_description||e))+'';
   if(/invalid_code/i.test(m))return'Código de convite não encontrado.';if(/forbidden/i.test(m))return'Seu perfil não permite esta ação.';if(/last_owner/i.test(m))return'O laboratório precisa de pelo menos um Dono.';if(/limit_users/i.test(m))return'O plano do laboratório atingiu o limite de usuários. Fale com o CERIONE para mudar de plano.';
   if(/Failed to fetch|NetworkError/i.test(m))return'Sem conexão com a internet.';return m};
 /* ---------- acesso ---------- */
-function loginScreen(info=''){
-  screen(`<p class="sub" style="margin:0">Gestão para laboratórios de prótese dentária. Entre com seu e-mail.</p><div id="au-msg" class="msg ${info?'ok':''}" ${info?'':'hidden'}>${h(info)}</div>
+/* ---------- conta: entrar, cadastro (empresa + responsável), senha provisória e recuperação ---------- */
+const dig=s=>String(s||'').replace(/\D/g,'');
+const cpfOk=v=>{const c=dig(v);if(c.length!==11||/^(\d)\1+$/.test(c))return false;for(const n of[9,10]){let s=0;for(let i=0;i<n;i++)s+=+c[i]*(n+1-i);if((s*10)%11%10!==+c[n])return false}return true};
+const cnpjOk=v=>{const c=dig(v);if(c.length!==14||/^(\d)\1+$/.test(c))return false;const k=n=>{const w=n===12?[5,4,3,2,9,8,7,6,5,4,3,2]:[6,5,4,3,2,9,8,7,6,5,4,3,2];const s=w.reduce((a,x,i)=>a+ +c[i]*x,0)%11;return s<2?0:11-s};return k(12)===+c[12]&&k(13)===+c[13]};
+const MASK={cnpj:v=>dig(v).slice(0,14).replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2'),
+  cpf:v=>dig(v).slice(0,11).replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2'),
+  tel:v=>{const d=dig(v).slice(0,11);return d.length<=10?d.replace(/^(\d{2})(\d)/,'($1) $2').replace(/(\d{4})(\d)/,'$1-$2'):d.replace(/^(\d{2})(\d)/,'($1) $2').replace(/(\d{5})(\d)/,'$1-$2')},
+  cep:v=>dig(v).slice(0,8).replace(/(\d{5})(\d)/,'$1-$2')};
+const UFS='AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
+async function conta(action,body){const{data,error}=await C.sb.functions.invoke('conta',{body:{action,...(body||{})}});
+  if(error){let j={};try{j=await error.context.json()}catch(e){}const er=new Error(j.error||error.message||'erro');er.fields=j.fields;er.status=j.status;throw er}return data||{}}
+const contaErr=e=>({cnpj_invalid:'CNPJ inválido. Confira os números.',cnpj_used:'Este CNPJ já tem um laboratório no CERIONE. Peça acesso ao dono ou use “Esqueci minha senha”.',cnpj_not_found:'CNPJ não encontrado na Receita Federal.',
+  cnpj_inactive:'Este CNPJ está '+String(e.status||'inativo').toLowerCase()+' na Receita Federal.',email_exists:'Este e-mail já tem conta. Use “Entrar” ou “Esqueci minha senha”.',rate_limited:'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.',
+  mail_not_configured:'O envio de e-mails do CERIONE ainda não foi ativado. Fale com o suporte.',mail_failed:'Não conseguimos enviar o e-mail agora. Tente de novo em instantes.',email_invalid:'E-mail inválido.',
+  invalid_fields:'Confira os campos destacados.',server_error:'Erro no servidor. Tente de novo em instantes.'}[e.message]||errTxt(e));
+const lk=(id,t)=>`<button type="button" class="lk" id="${id}" style="background:none;border:0;color:#8B96A8;text-decoration:underline;cursor:pointer;padding:0;font-size:13px">${t}</button>`;
+const F=(id,lab,attrs='',hint='')=>`<div class="field" data-f="${id}"><label for="${id}">${lab}</label><input id="${id}" ${attrs}>${hint?`<small class="mut" style="font-size:11.5px">${hint}</small>`:''}</div>`;
+if(!document.getElementById('au-css2')){const s2=document.createElement('style');s2.id='au-css2';s2.textContent=`.auth .box.mid{max-width:600px}.auth .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.auth .g3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+.auth .field{display:flex;flex-direction:column;gap:5px}.auth .field.bad input,.auth .field.bad select{border-color:#F28B81}.auth .field.bad label{color:#F28B81}
+.auth .steps{display:flex;gap:6px;font-size:12px;color:#8B96A8}.auth .steps span{flex:1;border-top:3px solid #212B38;padding-top:6px}.auth .steps span.on{border-color:#3DD9CE;color:#E7ECF3}
+.auth fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}.auth legend{font:700 15px var(--f-display);color:#E7ECF3;margin-bottom:4px;padding:0}
+.auth .ck{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#AEB8C8}.auth .ck input{width:auto;margin-top:3px}
+.auth .rf{font-size:12px;color:#5ED6A0}.auth .pw{position:relative}.auth .pw button{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:#8B96A8;cursor:pointer;font-size:12px}
+@media (max-width:520px){.auth .g2,.auth .g3{grid-template-columns:1fr}}`;document.head.appendChild(s2)}
+function pwToggle(){$('auth').querySelectorAll('.pw button').forEach(b=>b.addEventListener('click',()=>{const i=b.previousElementSibling;i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'Mostrar':'Ocultar'}))}
+function loginScreen(info='',kind='ok'){
+  screen(`<p class="sub" style="margin:0">Gestão para laboratórios de prótese dentária.</p><div id="au-msg" class="msg ${info?kind:''}" ${info?'':'hidden'}>${h(info)}</div>
   <form id="au-form"><div class="field"><label for="au-email">E-mail</label><input type="email" id="au-email" autocomplete="email" required></div>
-  <div class="field"><label for="au-pass">Senha</label><input type="password" id="au-pass" autocomplete="current-password" minlength="6" required></div>
-  <div class="row"><button class="btn primary" type="submit" data-m="in">Entrar</button><button class="btn" type="submit" data-m="up">Criar conta</button></div></form>
-  <button class="lk" id="au-forgot" style="background:none;border:0;color:#8B96A8;text-decoration:underline;cursor:pointer;align-self:flex-start;padding:0">Esqueci minha senha</button>`);
-  const novo=/criar-conta/.test(location.hash);if(novo){const sub=$('auth').querySelector('.sub');if(sub)sub.textContent='Crie sua conta para testar grátis por 14 dias, com todos os recursos. Sem cartão.';const bu=$('au-form').querySelector('[data-m=up]'),bi=$('au-form').querySelector('[data-m=in]');bu.className='btn primary';bi.className='btn';bu.parentNode.insertBefore(bu,bi);$('au-pass').setAttribute('autocomplete','new-password');setTimeout(()=>$('au-email').focus(),50)}
-  let mode=novo?'up':'in';$('au-form').querySelectorAll('button[type=submit]').forEach(b=>b.addEventListener('click',()=>mode=b.dataset.m));
-  $('au-form').addEventListener('submit',async e=>{e.preventDefault();const email=$('au-email').value.trim(),password=$('au-pass').value;msg(mode==='in'?'Entrando…':'Criando conta…');
-    try{try{sessionStorage.removeItem('cl-labmode')}catch(e){}if(mode==='in'){const{error}=await C.sb.auth.signInWithPassword({email,password});if(error)throw error;start()}
-    else{const{data,error}=await C.sb.auth.signUp({email,password,options:{emailRedirectTo:APPURL}});if(error)throw error;if(!data.session){msg('Conta criada. Enviamos um link de confirmação para '+email+'. Confirme e entre aqui.','ok');return}start()}}
-    catch(err){msg(errTxt(err),'err')}});
-  $('au-forgot').addEventListener('click',async()=>{const email=$('au-email').value.trim();if(!email){msg('Digite seu e-mail acima e clique de novo.','err');return}const{error}=await C.sb.auth.resetPasswordForEmail(email,{redirectTo:APPURL});msg(error?errTxt(error):'Enviamos um link para criar uma nova senha em '+email+'.',error?'err':'ok')})}
-function newPassScreen(){screen(`<h2 style="margin:0">Criar nova senha</h2><div id="au-msg" class="msg" hidden></div><form id="au-np"><div class="field"><label for="au-np1">Nova senha</label><input type="password" id="au-np1" minlength="6" required autocomplete="new-password"></div><button class="btn primary" type="submit">Salvar senha</button></form>`);
-  $('au-np').addEventListener('submit',async e=>{e.preventDefault();const{error}=await C.sb.auth.updateUser({password:$('au-np1').value});if(error){msg(errTxt(error),'err');return}history.replaceState(null,'',location.pathname);start()})}
-async function myLabs(){const{data,error}=await C.sb.from('lab_members').select('role,labs(id,name,invite_code,status,plan,trial_end)').eq('user_id',C.user.id);if(error)throw error;return(data||[]).filter(x=>x.labs).map(x=>({...x.labs,role:x.role}))}
+  <div class="field"><label for="au-pass">Senha</label><div class="pw"><input type="password" id="au-pass" autocomplete="current-password" required><button type="button">Mostrar</button></div><small class="mut" style="font-size:11.5px">No primeiro acesso, use a senha provisória que chegou no seu e-mail.</small></div>
+  <button class="btn primary" type="submit" data-m="in">Entrar</button></form>
+  <div class="row" style="justify-content:space-between;align-items:center">${lk('au-forgot','Esqueci minha senha')}${lk('au-invited','Fui convidado por um laboratório')}</div>
+  <div style="border-top:1px solid #212B38;padding-top:14px;display:flex;flex-direction:column;gap:8px"><span class="mut" style="font-size:13px">Ainda não usa o CERIONE?</span><button class="btn" type="button" id="au-go-up">Criar conta · 14 dias grátis</button></div>`);
+  pwToggle();
+  $('au-form').addEventListener('submit',async e=>{e.preventDefault();const email=$('au-email').value.trim(),password=$('au-pass').value;msg('Entrando…');
+    try{try{sessionStorage.removeItem('cl-labmode')}catch(e){}const{error}=await C.sb.auth.signInWithPassword({email,password});if(error)throw error;start()}catch(err){msg(errTxt(err),'err')}});
+  $('au-forgot').addEventListener('click',()=>forgotScreen($('au-email').value.trim()));
+  $('au-invited').addEventListener('click',()=>forgotScreen($('au-email').value.trim(),true));
+  $('au-go-up').addEventListener('click',()=>signupScreen());
+  if(/criar-conta/.test(location.hash))signupScreen()}
+function forgotScreen(email='',inv=false){
+  screen(`<h2 style="margin:0">${inv?'Primeiro acesso de convidado':'Esqueci minha senha'}</h2><p class="sub" style="margin:0">${inv?'Digite o e-mail que o laboratório cadastrou. Enviamos uma senha provisória para você entrar.':'Digite o e-mail da sua conta. Enviamos um link para criar uma nova senha.'}</p><div id="au-msg" class="msg" hidden></div>
+  <form id="au-fg"><div class="field"><label for="au-fe">E-mail</label><input type="email" id="au-fe" autocomplete="email" required value="${h(email)}"></div><button class="btn primary" type="submit">${inv?'Receber senha provisória':'Enviar link'}</button></form>${lk('au-back','← Voltar para entrar')}`);
+  $('au-back').addEventListener('click',()=>loginScreen());setTimeout(()=>$('au-fe').focus(),30);
+  $('au-fg').addEventListener('submit',async e=>{e.preventDefault();const em=$('au-fe').value.trim(),b=$('au-fg').querySelector('button');b.disabled=true;msg('Enviando…');
+    try{await conta('forgot',{email:em});msg(inv?`Se ${em} tiver um convite, a senha provisória chega em instantes. Confira também a caixa de spam.`:`Se ${em} tiver conta no CERIONE, o link chega em instantes. Confira também a caixa de spam. O link vale por 1 hora.`,'ok')}
+    catch(err){msg(contaErr(err),'err')}finally{b.disabled=false}})}
+function signupScreen(){let step=1,rf=null;const V={};
+  screen(`<h2 style="margin:0">Criar conta · 14 dias grátis</h2><p class="sub" style="margin:0">Com todos os recursos e sem cartão. A senha provisória chega no e-mail do responsável.</p>
+  <div class="steps"><span class="on">1. Empresa</span><span>2. Responsável</span></div><div id="au-msg" class="msg" hidden></div>
+  <form id="au-up" novalidate><fieldset id="st1"><legend>Dados da empresa</legend>
+   ${F('su-cnpj','CNPJ','inputmode="numeric" autocomplete="off" placeholder="00.000.000/0000-00" required','Buscamos os dados na Receita Federal automaticamente.')}<div id="su-rf" class="rf" hidden></div>
+   ${F('su-legal','Razão social','required autocomplete="organization"')}
+   ${F('su-trade','Nome do laboratório (nome fantasia)','required','É o nome que aparece no sistema e nos documentos.')}
+   <div class="g2">${F('su-cep','CEP','inputmode="numeric" autocomplete="postal-code"')}${F('su-num','Número','autocomplete="address-line2"')}</div>
+   ${F('su-street','Endereço','autocomplete="address-line1"')}
+   <div class="g3">${F('su-dist','Bairro')}${F('su-city','Cidade','required autocomplete="address-level2"')}<div class="field" data-f="su-uf"><label for="su-uf">UF</label><select id="su-uf" required><option value=""></option>${UFS.map(u=>`<option>${u}</option>`).join('')}</select></div></div>
+   <button class="btn primary" type="button" id="su-next">Continuar</button></fieldset>
+  <fieldset id="st2" hidden><legend>Responsável pela conta (pessoa física)</legend>
+   ${F('su-name','Nome completo','required autocomplete="name"')}
+   <div class="g2">${F('su-cpf','CPF','inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" required')}${F('su-tel','Celular / WhatsApp','type="tel" inputmode="tel" autocomplete="tel" placeholder="(43) 99999-9999" required')}</div>
+   ${F('su-email','E-mail','type="email" autocomplete="email" required','A senha provisória e os avisos da conta vão para este e-mail.')}
+   ${F('su-email2','Confirme o e-mail','type="email" autocomplete="off" required')}
+   <label class="ck"><input type="checkbox" id="su-terms"> <span>Li e aceito os termos de uso e autorizo o tratamento destes dados para criar e administrar a conta, conforme a LGPD.</span></label>
+   <div class="row"><button class="btn" type="button" id="su-prev">Voltar</button><button class="btn primary" type="submit">Criar conta</button></div></fieldset></form>
+  ${lk('au-back','Já tenho conta · Entrar')}`);
+  const box=$('auth').querySelector('.box');box.classList.add('mid');
+  [['su-cnpj','cnpj'],['su-cpf','cpf'],['su-tel','tel'],['su-cep','cep']].forEach(([i,m])=>$(i).addEventListener('input',e=>{e.target.value=MASK[m](e.target.value)}));
+  $('au-back').addEventListener('click',()=>{if(/criar-conta/.test(location.hash))history.replaceState(null,'',location.pathname);loginScreen()});
+  const bad=(ids)=>{box.querySelectorAll('.field.bad').forEach(x=>x.classList.remove('bad'));ids.forEach(i=>{const f=box.querySelector(`[data-f="${i}"]`);if(f)f.classList.add('bad')});if(ids.length){const f=$(ids[0]);if(f)f.focus()}};
+  const setV=(i,v)=>{if(v&&!$(i).value.trim())$(i).value=v};
+  let lastQ='';async function lookup(){const c=dig($('su-cnpj').value);if(c.length!==14||c===lastQ)return;lastQ=c;const out=$('su-rf');
+    if(!cnpjOk(c)){bad(['su-cnpj']);msg('CNPJ inválido. Confira os números.','err');return}bad([]);msg('');out.hidden=false;out.style.color='#8B96A8';out.textContent='Consultando a Receita Federal…';
+    try{const d=await conta('cnpj',{cnpj:c});if(!d.found){out.textContent='Consulta indisponível agora. Preencha os dados manualmente.';return}rf=d;
+      setV('su-legal',d.legal_name);setV('su-trade',d.trade_name?d.trade_name.replace(/\w\S*/g,w=>w[0]+w.slice(1).toLowerCase()):'');setV('su-cep',MASK.cep(d.cep));setV('su-street',[d.street,d.comp].filter(Boolean).join(', '));setV('su-num',d.number);setV('su-dist',d.district);setV('su-city',d.city?d.city.replace(/\w\S*/g,w=>w[0]+w.slice(1).toLowerCase()):'');if(d.uf&&!$('su-uf').value)$('su-uf').value=d.uf;
+      out.style.color='';out.textContent='Situação na Receita: '+(d.status||'—')+(d.cnae?' · '+d.cnae:'');if(/BAIXADA|NULA|INAPTA|SUSPENSA/i.test(d.status||'')){out.style.color='#EBBC6C'}}
+    catch(err){out.hidden=true;lastQ='';if(err.message==='cnpj_used'||err.message==='cnpj_not_found'||err.message==='cnpj_invalid')bad(['su-cnpj']);msg(contaErr(err),'err')}}
+  $('su-cnpj').addEventListener('input',()=>{if(dig($('su-cnpj').value).length===14)lookup()});$('su-cnpj').addEventListener('blur',lookup);
+  const go=n=>{step=n;$('st1').hidden=n!==1;$('st2').hidden=n!==2;box.querySelectorAll('.steps span').forEach((s,i)=>s.classList.toggle('on',i<n));msg('');setTimeout(()=>$(n===1?'su-cnpj':'su-name').focus(),30)};
+  $('su-next').addEventListener('click',()=>{const b=[];if(!cnpjOk($('su-cnpj').value))b.push('su-cnpj');['su-legal','su-trade','su-city'].forEach(i=>{if(!$(i).value.trim())b.push(i)});if(!$('su-uf').value)b.push('su-uf');
+    bad(b);if(b.length){msg(b[0]==='su-cnpj'?'CNPJ inválido. Confira os números.':'Preencha os campos destacados.','err');return}go(2)});
+  $('su-prev').addEventListener('click',()=>go(1));
+  $('au-up').addEventListener('submit',async e=>{e.preventDefault();if(step===1){$('su-next').click();return}
+    const em=$('su-email').value.trim().toLowerCase(),b=[];if($('su-name').value.trim().split(/\s+/).length<2)b.push('su-name');if(!cpfOk($('su-cpf').value))b.push('su-cpf');if(dig($('su-tel').value).length<10)b.push('su-tel');
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em))b.push('su-email');else if($('su-email2').value.trim().toLowerCase()!==em)b.push('su-email2');bad(b);
+    if(b.length){msg({'su-name':'Digite o nome completo do responsável.','su-cpf':'CPF inválido. Confira os números.','su-tel':'Celular incompleto.','su-email':'E-mail inválido.','su-email2':'Os dois e-mails não são iguais.'}[b[0]],'err');return}
+    if(!$('su-terms').checked){msg('Para criar a conta, aceite os termos de uso.','err');return}
+    const btn=$('au-up').querySelector('button[type=submit]');btn.disabled=true;msg('Criando sua conta…');
+    try{await conta('signup',{terms:true,company:{cnpj:dig($('su-cnpj').value),legal_name:$('su-legal').value,trade_name:$('su-trade').value,cep:$('su-cep').value,street:$('su-street').value,number:$('su-num').value,district:$('su-dist').value,city:$('su-city').value,uf:$('su-uf').value},
+      owner:{name:$('su-name').value,cpf:dig($('su-cpf').value),phone:dig($('su-tel').value),email:em}});
+      if(/criar-conta/.test(location.hash))history.replaceState(null,'',location.pathname);
+      screen(`<h2 style="margin:0">Conta criada</h2><div class="msg ok">Enviamos a senha provisória para <b>${h(em)}</b>.</div>
+       <ol style="margin:0;padding-left:20px;color:#AEB8C8;font-size:14px;display:flex;flex-direction:column;gap:6px"><li>Abra o e-mail “Sua senha provisória do CERIONE”. Se não aparecer em alguns minutos, olhe o spam.</li><li>Entre aqui com o seu e-mail e a senha provisória.</li><li>Crie a sua senha definitiva. Pronto: 14 dias de teste com tudo liberado.</li></ol>
+       <button class="btn primary" id="au-done">Ir para entrar</button>${lk('au-resend','Não chegou? Reenviar')}`);
+      $('au-done').addEventListener('click',()=>{loginScreen();$('au-email').value=em;$('au-pass').focus()});$('au-resend').addEventListener('click',()=>forgotScreen(em,true))}
+    catch(err){btn.disabled=false;const map={cnpj:'su-cnpj',legal_name:'su-legal',trade_name:'su-trade',city:'su-city',uf:'su-uf',owner_name:'su-name',cpf:'su-cpf',phone:'su-tel',email:'su-email'};
+      if(err.fields){const ids=err.fields.map(f=>map[f]).filter(Boolean);if(ids.some(i=>['su-cnpj','su-legal','su-trade','su-city','su-uf'].includes(i)))go(1);bad(ids)}
+      if(/cnpj/.test(err.message)){go(1);bad(['su-cnpj'])}if(err.message==='email_exists')bad(['su-email']);msg(contaErr(err),'err')}});
+  setTimeout(()=>$('su-cnpj').focus(),50)}
+function newPassScreen(forced){const em=(C.user&&C.user.email)||'';
+  screen(`<h2 style="margin:0">${forced?'Crie sua senha definitiva':'Criar nova senha'}</h2><p class="sub" style="margin:0">${forced?'Você entrou com a senha provisória. Escolha agora a senha que vai usar daqui para frente.':'Escolha uma nova senha para '+h(em)+'.'}</p><div id="au-msg" class="msg" hidden></div>
+  <form id="au-np" novalidate><div class="field"><label for="au-np1">Nova senha</label><div class="pw"><input type="password" id="au-np1" minlength="8" required autocomplete="new-password"><button type="button">Mostrar</button></div><small class="mut" style="font-size:11.5px">Mínimo de 8 caracteres, com letras e números.</small></div>
+  <div class="field"><label for="au-np2">Repita a nova senha</label><input type="password" id="au-np2" minlength="8" required autocomplete="new-password"></div><button class="btn primary" type="submit">Salvar senha e entrar</button></form>${lk('au-np-out','Sair')}`);
+  pwToggle();$('au-np-out').addEventListener('click',async()=>{await C.sb.auth.signOut();loginScreen()});setTimeout(()=>$('au-np1').focus(),30);
+  $('au-np').addEventListener('submit',async e=>{e.preventDefault();const p=$('au-np1').value;
+    if(p.length<8||!/[A-Za-z]/.test(p)||!/\d/.test(p)){msg('Use pelo menos 8 caracteres, com letras e números.','err');return}if(p!==$('au-np2').value){msg('As duas senhas não são iguais.','err');return}
+    msg('Salvando…');const{error}=await C.sb.auth.updateUser({password:p,data:{must_change_password:false}});
+    if(error){msg(/different from the old|same_password/i.test(error.message||error.code||'')?'A nova senha precisa ser diferente da provisória.':errTxt(error),'err');return}
+    if(C.user)C.user.user_metadata={...(C.user.user_metadata||{}),must_change_password:false};history.replaceState(null,'',location.pathname);start()})}
+async function recoverFromLink(){const m=(location.hash||'').match(/rec=([^&]+)/);if(!m)return false;history.replaceState(null,'',location.pathname);screen('<p class="sub">Validando o link…</p>');
+  const{data,error}=await C.sb.auth.verifyOtp({token_hash:decodeURIComponent(m[1]),type:'recovery'});
+  if(error||!data||!data.session){loginScreen('Este link de redefinição expirou ou já foi usado. Peça um novo em “Esqueci minha senha”.','err');return true}
+  C.user=data.session.user;newPassScreen(false);return true}
+async function myLabs(){const{data,error}=await C.sb.from('lab_members').select('role,labs(id,name,invite_code,status,plan,trial_end,cnpj,city,uf,phone,legal_name,address)').eq('user_id',C.user.id);if(error)throw error;return(data||[]).filter(x=>x.labs).map(x=>({...x.labs,role:x.role}))}
 function setupScreen(){screen(`<p class="sub" style="margin:0">Conectado como <b>${h(C.user.email)}</b>.</p><div id="au-msg" class="msg" hidden></div>
   <form id="au-new"><h2 style="margin:0">Criar meu laboratório</h2><p class="mut" style="margin:0;font-size:12.5px">Começa com 14 dias de teste grátis.</p><div class="field"><label for="au-lab">Nome do laboratório</label><input type="text" id="au-lab" required></div><button class="btn primary" type="submit">Criar laboratório</button></form>
   <form id="au-join" style="border-top:1px solid #212B38;padding-top:14px"><h2 style="margin:0">Ou entrar na equipe de um laboratório</h2><p class="mut" style="margin:0;font-size:12.5px">Se o laboratório convidou seu e-mail, o acesso aparece sozinho ao entrar. Também dá para usar o código de convite.</p><div class="field"><label for="au-code">Código de convite</label><input type="text" id="au-code" required placeholder="Ex.: 7F3A9C21" style="text-transform:uppercase"></div><button class="btn" type="submit">Entrar com o código</button></form>
@@ -99,7 +196,7 @@ async function openLab(lab){C.lab=lab;C.role=lab.role;screen('<p class="sub">Car
   try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:lab.id});C.st=(Array.isArray(st)?st[0]:st)||{status:lab.status,can_write:true};if(C.role==='dono_suporte')C.st={...C.st,can_write:false,support:true};await loadMembers();try{const{data:fe}=await C.sb.rpc('my_lab_features',{p_lab:lab.id});if(fe){window.CERIONE_FEATURES=Array.isArray(fe.modules)?fe.modules:null;window.CERIONE_PLAN=fe}}catch(e){}try{if(window.waReset)waReset()}catch(e){}
     let docs=await loadDocs();
     if(!Object.keys(docs).length){if(C.role!=='dono'){screen(`<div class="msg">O dono do laboratório ainda não fez o primeiro acesso. Tente de novo mais tarde.</div><button class="btn" data-out="1">Sair</button>`);return}
-      const d=await firstRunScreen();S=d||emptyData();if(!S.invoices)S.invoices=[];if(!S.posted)S.posted={fix:[],com:[]};migrate();if(!S.fichasV)importCatalog();if(!d)S.settings.lab=lab.name;delete S.demoAutoV;S.demoAutoV=5;
+      const d=await firstRunScreen();S=d||emptyData();if(!S.invoices)S.invoices=[];if(!S.posted)S.posted={fix:[],com:[]};migrate();if(!S.fichasV)importCatalog();if(!d)S.settings.lab=lab.name;{const st=S.settings,fmtD=c=>(c=String(c||'').replace(/\D/g,''),c.length===14?c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):c),A=lab.address||{};if(!st.doc&&lab.cnpj)st.doc=fmtD(lab.cnpj);if(!st.city&&lab.city)st.city=lab.city;if(!st.uf&&lab.uf)st.uf=lab.uf;if(!st.phone&&lab.phone)st.phone=MASK.tel(lab.phone);if(!st.legalName&&lab.legal_name)st.legalName=lab.legal_name;if(!st.address&&A.street)st.address=[A.street,A.number].filter(Boolean).join(', ')+(A.district?' - '+A.district:'')+(A.cep?' · CEP '+MASK.cep(A.cep):'')}delete S.demoAutoV;S.demoAutoV=5;
       Object.keys(AREAS).forEach(a=>C.sent[a]=null);await push(true)}
     else{S=merge(docs);migrate();if(!S.fichasV&&C.role==='dono')importCatalog();Object.keys(AREAS).forEach(a=>C.sent[a]=J(split()[a]))}}
   catch(e){screen(`<div class="msg err">Não foi possível carregar: ${h(errTxt(e))}</div><button class="btn primary" onclick="location.reload()">Tentar de novo</button>`);return}
@@ -141,7 +238,7 @@ function cloudAccess(){const inv=C.invites||[];return`<section class="panel"><di
 async function invite(){openModal(mhead('Convidar pessoa')+`<form id="cl-inv" class="grid"><div class="form-grid">${fld('ci-email','E-mail da pessoa',inp('ci-email','','email','required'))}${fld('ci-role','Perfil',roleSel('ci-role','tec'))}${fld('ci-team','Profissional da equipe (técnicos)',`<select id="ci-team"><option value="">— nenhum —</option>${(S.team||[]).filter(t=>t.active!==false).map(t=>`<option value="${t.id}">${h(t.name)}</option>`).join('')}</select>`)}</div>
   <p class="mut" style="font-size:12.5px;margin:0">Envie à pessoa o endereço ${h(APPURL)}: ela cria a conta com este e-mail e já entra no laboratório.</p><div class="sheet-foot"><span class="err" id="ci-err"></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn primary" type="submit">Convidar</button></div></div></form>`,true);
   $('cl-inv').addEventListener('submit',async e=>{e.preventDefault();e.stopPropagation();const email=$('ci-email').value.trim().toLowerCase(),role=$('ci-role').value,team=$('ci-team').value;const{error}=await C.sb.rpc('invite_member',{p_lab:C.lab.id,p_email:email,p_role:role});
-    if(error){$('ci-err').textContent=errTxt(error);return}if(team){S.memberTeam={...(S.memberTeam||{}),[email]:team};save()}closeModal();render();copyText(`Você foi convidado para o CERIONE (${C.lab.name}).\nAcesse ${APPURL}, clique em "Criar conta" e use o e-mail ${email}.`,'Convite criado · mensagem copiada para enviar')},true)}
+    if(error){$('ci-err').textContent=errTxt(error);return}if(team){S.memberTeam={...(S.memberTeam||{}),[email]:team};save()}closeModal();render();toast('Convite criado · enviando o acesso por e-mail…');conta('invite_mail',{lab:C.lab.id,email}).then(()=>toast('Acesso enviado por e-mail para '+email)).catch(err=>copyText(`Você foi convidado para o CERIONE (${C.lab.name}).\nAcesse ${APPURL}, clique em "Fui convidado por um laboratório" e use o e-mail ${email}.`,'Não deu para enviar o e-mail ('+contaErr(err)+'). Mensagem copiada para você mandar.'))},true)}
 /* ---------- histórico ---------- */
 async function histModal(){const{data,error}=await C.sb.rpc('list_history',{p_lab:C.lab.id});const A={producao:'Produção',clientes:'Clientes',mensagens:'Mensagens',financeiro:'Financeiro',estoque:'Estoque',custos:'Custos',config:'Configurações'};
   openModal(mhead('Histórico no servidor')+`<p class="sub" style="margin:0">Cópia automática de cada área a cada hora de uso, por 90 dias. Voltar a uma cópia substitui aquela área para toda a equipe.</p>
@@ -150,6 +247,7 @@ async function histModal(){const{data,error}=await C.sb.rpc('list_history',{p_la
 /* ---------- GESTÃO CERIONE: painel em admin.js ---------- */
 const LABMODE='cl-labmode';
 function adminScreen(){try{sessionStorage.removeItem(LABMODE)}catch(e){}return window.CERIONE_ADMIN.open()}
+window.CERIONE_CONTA=conta;
 C.ui={MARK,openLab:l=>{try{sessionStorage.setItem(LABMODE,'1')}catch(e){}return openLab(l)},labsFromAdmin:async()=>{const labs=await myLabs();pickScreen(labs)}};
 /* ---------- eventos ---------- */
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-cl],[data-out]');if(!b)return;
@@ -167,7 +265,8 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.dataset.clSupport){const{error}=await C.sb.rpc('set_support_access',{p_lab:C.lab.id,p_on:t.checked});if(error){toast(errTxt(error));t.checked=!t.checked}else{C.st.support_access=t.checked;toast(t.checked?'Suporte CERIONE liberado':'Acesso do suporte desligado')}e.stopPropagation()}
 },true);
 /* ---------- início ---------- */
-async function start(){if(/type=recovery/.test(location.hash))return;const{data:{session}}=await C.sb.auth.getSession();if(!session){loginScreen();return}C.user=session.user;
+async function start(){if(/type=recovery/.test(location.hash))return;if(await recoverFromLink())return;const{data:{session}}=await C.sb.auth.getSession();if(!session){loginScreen();return}C.user=session.user;
+  if(C.user.user_metadata&&C.user.user_metadata.must_change_password){newPassScreen(true);return}
   try{await C.sb.rpc('claim_invites')}catch(e){}
   try{const{data:adm}=await C.sb.rpc('is_platform_admin');C.admin=!!adm}catch(e){C.admin=false}
   let labs;try{labs=await myLabs()}catch(e){screen(`<div class="msg err">${h(errTxt(e))}</div><button class="btn primary" onclick="location.reload()">Tentar de novo</button>`);return}
