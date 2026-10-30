@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Guia de envio ao laboratório</title>
+<meta name="description" content="O que enviar ao laboratório de prótese em cada tipo de trabalho, passo a passo e ilustrado.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Guia do dentista: cabeçalho com o laboratório, abas por tipo de trabalho, passos ilustrados em cartões */
+:root{--bg:#EEF1F5;--card:#fff;--ink:#0B1220;--mut:#5A6676;--line:#DCE2EA;--zir:#0B7A75;--zir-l:#3DD9CE;--soft:#D9F3F0;--il-a:#0B7A75;--il-b:#D9F3F0;--il-r:#D64545;--f-d:'Sora',system-ui,sans-serif;--f-b:'Manrope',system-ui,sans-serif;color-scheme:light}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 16px/1.55 var(--f-b)}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{background:#0A0E14;color:#E7ECF3}
+header .wrap{padding-block:28px 22px;display:flex;flex-wrap:wrap;gap:10px 24px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font:600 12px/1 var(--f-b);letter-spacing:.14em;text-transform:uppercase;color:var(--zir-l)}
+h1{font:700 clamp(26px,4.4vw,38px)/1.15 var(--f-d);margin:8px 0 6px;text-wrap:balance}
+header p{margin:0;color:#A9B3C2;max-width:60ch}
+.lab{font:600 15px/1.3 var(--f-d);color:#fff;text-align:right}.lab small{display:block;font:500 12px var(--f-b);color:#8B96A8;margin-top:4px}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(238,241,245,.95);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:6px;overflow-x:auto;padding-block:10px}
+nav button{flex:none;border:1px solid var(--line);background:#fff;color:var(--ink);font:600 14px var(--f-b);padding:8px 14px;border-radius:999px;cursor:pointer}
+nav button[aria-pressed=true]{background:var(--zir);border-color:var(--zir);color:#fff}
+nav button:focus-visible,.act button:focus-visible{outline:3px solid var(--zir-l);outline-offset:2px}
+main .wrap{padding-block:22px 40px}
+.intro{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;margin-bottom:18px}
+.intro h2{font:700 24px/1.2 var(--f-d);margin:0}.intro p{margin:6px 0 0;color:var(--mut);max-width:64ch}
+.act{display:flex;gap:8px;flex-wrap:wrap}.act button{border:0;background:var(--ink);color:#fff;font:600 14px var(--f-b);padding:10px 16px;border-radius:10px;cursor:pointer}.act button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;counter-reset:s}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;break-inside:avoid;min-width:0}
+.ill{background:#F6F9FA;border-bottom:1px solid var(--line);aspect-ratio:16/10;display:grid;place-items:center;color:var(--ink);max-width:100%}
+.ill svg{width:82%;height:auto;max-height:100%}
+.tx{padding:14px 16px 16px;display:flex;gap:12px}
+.n{flex:none;width:28px;height:28px;border-radius:50%;background:var(--soft);color:var(--zir);font:700 14px/28px var(--f-d);text-align:center;font-variant-numeric:tabular-nums}
+.tx h3{font:700 16px/1.3 var(--f-d);margin:2px 0 6px;text-wrap:balance}.tx p{margin:0;color:#334050;font-size:14.5px}
+.foot{margin-top:22px;color:var(--mut);font-size:13.5px}
+@media (max-width:640px){.lab{text-align:left}}
+@media print{nav,.act{display:none}body{background:#fff}header{background:#fff;color:#000}header p,.lab small{color:#444}.lab{color:#000}.eyebrow{color:var(--zir)}.steps{grid-template-columns:1fr 1fr}.steps li{border-color:#ccc}}
+</style></head><body>
+<header><div class="wrap"><div><div class="eyebrow">Guia de envio ao laboratório</div><h1 id="h">O que enviar em cada trabalho</h1><p>Siga estes passos e o trabalho entra direto em produção, sem idas e vindas.</p></div><div class="lab" id="lab"></div></div></header>
+<nav aria-label="Tipo de trabalho"><div class="wrap" id="tabs"></div></nav>
+<main><div class="wrap"><div class="intro"><div><h2 id="tt"></h2><p id="ti"></p></div><div class="act"><button id="pr" type="button">Salvar em PDF</button><button id="sh" class="ghost" type="button">Copiar link</button></div></div>
+<ol class="steps" id="steps"></ol>
+<p class="foot">Dúvidas sobre um caso específico? Fale com o laboratório antes de enviar. Ilustrações esquemáticas, fora de escala.</p></div></main>
+<script src="pop_dent.js"></script>
+<script>
+(function(){const Q=new URLSearchParams(location.search),D=window.POP_DENT,IL=window.POP_IL,order=['coroa','psi','protocolo','pt','lente'];
+let k=order.includes(Q.get('t'))?Q.get('t'):(order.includes(location.hash.slice(1))?location.hash.slice(1):'coroa');
+const lab=(Q.get('lab')||'').slice(0,80),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+document.getElementById('lab').innerHTML=lab?esc(lab)+'<small>Laboratório de prótese</small>':'';
+if(lab)document.title='Guia de envio · '+lab;
+function draw(){const P=D[k];document.getElementById('tabs').innerHTML=order.map(x=>`<button type="button" data-k="${x}" aria-pressed="${x===k}">${esc(D[x].n)}</button>`).join('');
+ document.getElementById('tt').textContent=P.n;document.getElementById('ti').textContent=P.intro;
+ document.getElementById('steps').innerHTML=P.items.map((it,i)=>`<li><div class="ill" role="img" aria-label="${esc(it.t)}">${IL[it.il]||''}</div><div class="tx"><span class="n">${i+1}</span><div><h3>${esc(it.t)}</h3><p>${esc(it.x)}</p></div></div></li>`).join('')}
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;k=b.dataset.k;const u=new URL(location.href);u.searchParams.set('t',k);u.hash='';try{history.replaceState(null,'',u)}catch(er){}draw()});
+document.getElementById('pr').addEventListener('click',()=>window.print());
+document.getElementById('sh').addEventListener('click',e=>{const u=location.href;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>{e.target.textContent='Link copiado'},()=>{prompt('Copie o link:',u)})});
+draw()})();
+</script></body></html>
