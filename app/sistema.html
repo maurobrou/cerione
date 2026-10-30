@@ -878,7 +878,7 @@ const ROLES={dono:{n:'Dono / Admin',d:'Acesso total, usuários, auditoria e dado
  fin:{n:'Financeiro',d:'Caixa, receber, pagar, faturas, fechamento, notas e relatórios. Vê custos sem alterar.',p:['painel','fin','com','cad_v','compras_v','compras','cli','est_v','os_v','prod','rel','valores','preco']},
  rec:{n:'Recepção',d:'Abre e edita OS, cadastra dentistas, mensagens e estoque. Vê valores, não altera preço nem financeiro.',p:['painel','cli','est_v','estoque','os_v','os','prod','rel','valores','compras_v']},
  tec:{n:'Técnico',d:'Vê só as próprias OS e etapas (quando ligado a um profissional da equipe) e conclui as etapas dele. Não vê valores.',p:['os_v','prod','etapa','est_v','rel']}};
-const VIEW_PERM={cfo:'fin',reforma:'fin',painel:'painel',caixa:'fin',receber:'fin',fechamento:'fin',pagar:'fin',notas:'fin',resultado:'fin',contas:'fin',relatorios:'fin',comissoes:'com',servicos:'cad_v',equipe:'cad_v',config:'admin',audit:'admin',fornecedores:'compras_v',clientes:'cli',mensagens:'cli',estoque:'est_v',trabalhos:'os_v',producao:'prod',rel:'rel'};
+const VIEW_PERM={pops:'prod',cfo:'fin',reforma:'fin',painel:'painel',caixa:'fin',receber:'fin',fechamento:'fin',pagar:'fin',notas:'fin',resultado:'fin',contas:'fin',relatorios:'fin',comissoes:'com',servicos:'cad_v',equipe:'cad_v',config:'admin',audit:'admin',fornecedores:'compras_v',clientes:'cli',mensagens:'cli',estoque:'est_v',trabalhos:'os_v',producao:'prod',rel:'rel'};
 const ACT_PERM={'rec-pay':'fin','pay-pay':'fin','pp-open':'fin','fin-undo':'fin','inv-new':'fin','inv-del':'fin','ip-edit':'fin','fc-inv':'fin','fc-all':'fin','fc-edit':'fin','fc-target':'fin','fc-zero':'fin','post-fixed':'fin','post-comm':'fin','dun-copy':'fin','new':'os','ord-edit':'os','ord-cancel':'os','nx-add':'os','adv':'etapa','back':'etapa','cli-form':'cli','demo-gen':'admin','rc-all':'admin','tl-new':'admin','tl-pin':'admin','tl-off':'admin','pin-copy':'admin'};
 const FORM_PERM={invForm:'fin',ipForm:'fin',recForm:'fin',ppForm:'fin',cmForm:'fin',accForm:'fin',reschForm:'fin',nfeForm:'compras',noForm:'os',cliForm:'cli',svcForm:'cad',addFixed:'cad',addEquip:'cad',addTeam:'cad',matForm:'estoque',chAdd:'fin',usForm:'admin'};
 const UKEY='labline-user';
@@ -957,7 +957,7 @@ doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/>',search:'<c
 const ico=(k,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
 const MODS_ALL=[
  {id:'inicio',n:'Início',ic:'home',d:'Resumo do dia: produção, financeiro e pendências.',items:[['painel','Painel']]},
- {id:'producao',n:'Produção',ic:'tooth',d:'Ordens de serviço e o andamento de cada etapa.',items:[['trabalhos','Trabalhos (OS)'],['producao','Quadro de produção']]},
+ {id:'producao',n:'Produção',ic:'tooth',d:'Ordens de serviço e o andamento de cada etapa.',items:[['trabalhos','Trabalhos (OS)'],['producao','Quadro de produção'],['pops','POPs']]},
  {id:'clientes',n:'Clientes',ic:'users',d:'Dentistas, condições comerciais e mensagens.',items:[['clientes','Dentistas'],['mensagens','Mensagens']]},
  {id:'fin',n:'Financeiro',ic:'wallet',d:'Caixa, contas a receber e a pagar, fechamento e notas de serviço.',items:[['caixa','Fluxo de caixa'],['fechamento','Fechamento mensal'],['receber','Contas a receber'],['pagar','Contas a pagar'],['notas:saida','Notas fiscais (NFS-e)']]},
  {id:'estoque',n:'Estoque e compras',ic:'box',d:'Materiais, movimentações, notas de compra e fornecedores.',items:[['estoque:materiais','Materiais'],['estoque:movs','Movimentações'],['notas:entrada','Notas de compra (XML)'],['fornecedores','Fornecedores']]},
@@ -2200,7 +2200,7 @@ function openOrder(id){
 ${MASK||o.remake?'':costBox(c)}${o.remake?'<p class="note" style="margin:0">Retrabalho: sem cobrança e com valores zerados na produção (receita, custo, margem e comissão).</p>':''}
 ${o.notes?`<p class="note" style="margin:0">${esc(o.notes)}</p>`:''}
   <div><span class="lbl">Andamento</span><div class="tl" style="margin-top:8px">${tl}</div></div>
-  <div class="sheet-foot"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="bench" data-id="${o.id}">Ficha de bancada</button>${can('valores')?`<button class="btn" data-ext="${o.id}">Extrato para o dentista</button>`:''}<button class="btn" data-act="qr-label" data-id="${o.id}">Etiqueta QR</button>${featOn('chat')?`<button class="btn" data-chat-cite="${o.id}">Comentar no chat</button>`:''}${o.status!=='cancelado'?`<button class="btn" data-act="ord-edit" data-id="${o.id}">Editar</button>`:''}${o.status!=='cancelado'&&!(inv0&&recsOf(inv0).some(isPaid))?`<button class="btn danger" data-act="ord-cancel" data-id="${o.id}" data-confirm="Confirmar cancelamento">Cancelar trabalho</button>`:''}${o.idx>0&&o.status!=='cancelado'&&!(inv0&&recsOf(inv0).some(isPaid))?`<button class="btn" data-act="back" data-id="${o.id}">← Voltar etapa</button>`:''}</div>
+  <div class="sheet-foot"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="bench" data-id="${o.id}">Ficha de bancada</button>${popType(svcOf(o))?`<button class="btn" data-pop="${o.id}">POP</button>`:''}${can('valores')?`<button class="btn" data-ext="${o.id}">Extrato para o dentista</button>`:''}<button class="btn" data-act="qr-label" data-id="${o.id}">Etiqueta QR</button>${featOn('chat')?`<button class="btn" data-chat-cite="${o.id}">Comentar no chat</button>`:''}${o.status!=='cancelado'?`<button class="btn" data-act="ord-edit" data-id="${o.id}">Editar</button>`:''}${o.status!=='cancelado'&&!(inv0&&recsOf(inv0).some(isPaid))?`<button class="btn danger" data-act="ord-cancel" data-id="${o.id}" data-confirm="Confirmar cancelamento">Cancelar trabalho</button>`:''}${o.idx>0&&o.status!=='cancelado'&&!(inv0&&recsOf(inv0).some(isPaid))?`<button class="btn" data-act="back" data-id="${o.id}">← Voltar etapa</button>`:''}</div>
   ${st?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="lbl">${SN[st]} por</span>${techSelect(o,st)}<button class="btn primary" data-act="adv" data-id="${o.id}">Concluir ${SN[st]}</button></div>`:`<span class="pill done">${o.status==='cancelado'?'Trabalho cancelado':'Trabalho entregue'}</span>`}</div>`);
 }
 
@@ -3612,6 +3612,115 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
     rows:L.map(e=>[...(g==='cat'?[e.n]:[e.n,e.cat,e.un]),e.os.size,r2(e.pc),r2(e.rt),e.pc+e.rt?e.rt/(e.pc+e.rt)*100:0,r2(e.gr),r2(e.ds),r2(e.vl),e.pc?r2(e.vl/e.pc):0,r2(e.mat),r2(e.mg),e.vl?e.mg/e.vl*100:0,TV?e.vl/TV*100:0]),
     tot:Object.fromEntries((g==='cat'?[1,2,3,5,6,7,9,10]:[3,4,5,7,8,9,11,12]).map(i=>[i,1])),
     kpi:[['Peças produzidas',TP.toLocaleString('pt-BR')],['Retrabalhos',TR.toLocaleString('pt-BR')+' ('+pct(TP+TR?TR/(TP+TR)*100:0)+')'],['Valor final',fmt(TV)],['Preço médio por peça',fmt(TP?TV/TP:0)],['Tipos de peça',L.length]]}}});}
+/* ================= POPs: o que o dentista envia e como a bancada executa, por tipo de trabalho ================= */
+/* Base editável pelo laboratório (S.settings.pops). Parâmetros de forno, resina e torque seguem sempre o fabricante. */
+const POP_DEF={
+coroa:{n:'Coroas',d:'Coroas e elementos unitários ou parciais sobre dente: zircônia, e-max, PMMA, inlay/onlay.',
+ dent:['Escaneamento intraoral (STL) ou moldagem em silicone de adição, sem bolhas ou rasgos e com o término do preparo visível em toda a volta.','Antagonista (arquivo ou modelo) e registro de mordida em máxima intercuspidação.','Preparo com término definido e espaço oclusal suficiente para o material escolhido.','Material desejado: zircônia monolítica, zircônia com cerâmica, dissilicato (e-max) ou PMMA provisório.','Cor: escala usada (VITA Classical ou 3D-Master), cor do corpo, cervical e incisal. Para e-max, informe também a cor do dente preparado (substrato).','Fotos com a escala encostada no dente, com luz natural e sem flash direto, e uma foto do sorriso.','Dentes envolvidos, paciente e data de prova ou entrega desejada.','Observações: pontos de contato, forma, textura e caracterizações.'],
+ banc:{rec:['Conferir moldagem ou arquivo, antagonista, registro, cor e fotos.','Desinfetar a moldagem conforme o protocolo do laboratório.','Faltou informação ou o término está ilegível? Avise o dentista antes de iniciar e registre na OS.'],
+  mod:['Vazar gesso tipo IV na proporção do fabricante e respeitar o tempo de presa.','Troquelizar, recortar e evidenciar o término com grafite.','Articular com o registro de mordida.'],
+  cad:['Escanear o modelo ou importar o STL e marcar o término.','Definir espaço de cimento e espessuras mínimas conforme o material.','Conferir contatos proximais e oclusão com o antagonista.','Revisar o desenho antes de enviar para fresagem.'],
+  imp:['Imprimir modelo ou prova em resina quando a OS pedir.','Lavar e pós-curar conforme a resina.'],
+  fre:['Escolher disco ou bloco pela cor e pelo material.','Posicionar no nesting com conectores longe da margem e dos contatos.','Fresar, separar e acabar os conectores sem aquecer a peça.'],
+  cer:['Zircônia: sinterizar no programa do fabricante. E-max: cristalizar no programa do fabricante.','Maquiagem e glaze ou estratificação conforme a OS.','Conferir a cor com a escala e as fotos do dentista.'],
+  aca:['Ajustar contatos proximais e oclusão no articulador.','Polir ou aplicar glaze final.','Conferir a adaptação marginal no troquel com lupa.'],
+  con:['Checklist: adaptação marginal, contatos, oclusão, cor, forma, sem trincas.','Fotografar a peça pronta.','Encontrou problema? Volte a etapa e registre retrabalho, se for o caso.'],
+  exp:['Limpar, desinfetar e embalar com a identificação da OS e o modelo.','Concluir a etapa no CERIONE para gerar o aviso ao dentista e o extrato.']}},
+psi:{n:'PSI · prótese sobre implante',d:'Coroas e pontes sobre implante (cimentadas ou parafusadas), munhões personalizados, barras e componentes.',
+ dent:['Marca, sistema e plataforma do implante (ex.: cone morse, hexágono externo), diâmetro e componente usado.','Moldagem de transferência (moldeira aberta ou fechada) com transferentes firmes, ou escaneamento com o scan body correto do sistema.','Análogo, parafuso e componentes protéticos enviados (ou peça que o laboratório forneça).','Gengiva artificial ou informação de perfil gengival, antagonista e registro de mordida.','Retenção desejada: parafusada ou cimentada, e o material.','Cor com escala, fotos e o dente de cada implante.','Se haverá prova de estrutura antes da peça final.'],
+ banc:{rec:['Conferir transferente ou scan body com a marca e a plataforma informadas.','Listar os componentes recebidos na OS (Mat. fornecido).','Sistema não identificado? Não inicie: confirme com o dentista.'],
+  mod:['Encaixar o análogo no transferente com aperto manual leve, sem girar.','Confeccionar a gengiva artificial e vazar gesso tipo IV.','Conferir o assentamento do análogo.'],
+  cad:['Escanear com o scan body da biblioteca correta.','Escolher base de titânio ou link compatível com o sistema.','Desenhar o perfil de emergência e respeitar as espessuras mínimas.','Posicionar o acesso do parafuso fora da face vestibular sempre que possível.'],
+  imp:['Imprimir modelo ou prova em resina quando a OS pedir.'],
+  fre:['Fresar a coroa ou estrutura. Em barras e pontes, conferir a passividade antes de seguir.'],
+  fun:['Fundir ou soldar a estrutura e conferir a passividade (teste do parafuso único).'],
+  cer:['Sinterizar ou queimar conforme o material e conferir a cor.'],
+  aca:['Cimentar a coroa na base de titânio fora da boca, com o cimento indicado, e remover todo o excesso.','Polir o perfil de emergência.','Conferir o assentamento no análogo.'],
+  con:['Checklist: passividade, oclusão, contatos, cor, componentes e parafusos completos.'],
+  exp:['Embalar componentes, parafusos (identificados), análogo e modelo.','Informar na OS o torque recomendado pelo fabricante.']}},
+protocolo:{n:'Protocolos',d:'Prótese total sobre implantes: acrílico (Delara, Premium) ou cerâmica/zircônia.',
+ dent:['Marca, sistema e plataforma dos implantes e dos minipilares, com a quantidade e a posição.','Moldagem de transferência com transferentes unidos (ferulização), ou escaneamento com scan bodies.','Registro intermaxilar (plano de cera ou guia): dimensão vertical, linha média, linha do sorriso e corredor bucal.','Cor e tamanho dos dentes, cor da gengiva, fotos de face e do sorriso.','Antagonista e quais provas deseja: guia de verificação, barra, dentes.','Componentes enviados: análogos, parafusos e cilindros.'],
+ banc:{rec:['Conferir componentes, transferentes e número de implantes e registrar na OS.'],
+  mod:['Modelo com análogos e gengiva artificial.','Confeccionar guia de verificação (index) para o dentista conferir a posição dos implantes.'],
+  rol:['Plano de orientação conforme os registros enviados.','Enviar para prova quando a OS pedir.'],
+  fun:['Barra fundida ou fresada.','Teste de passividade (parafuso único). Sem passividade, corte e solde antes de seguir.'],
+  mon:['Montar os dentes pelas linhas de referência, com oclusão balanceada.','Prova de dentes com o dentista.'],
+  rem:['Remontar e ajustar conforme a prova.'],
+  acr:['Acrilizar conforme o fabricante da resina, sem porosidades.','Manter os acessos dos parafusos livres.'],
+  cad:['Protocolo cerâmico: desenhar sobre a base aprovada na prova.'],
+  imp:['Imprimir a prova em resina para aprovação do dentista.'],
+  fre:['Fresar a estrutura em zircônia e conferir a passividade.'],
+  cer:['Sinterizar e fazer a maquiagem gengival e dental conforme o fabricante.'],
+  aca:['Acabamento e polimento, com a base convexa e lisa para higienização.'],
+  con:['Checklist: passividade final, oclusão, estética, acessos e parafusos.'],
+  exp:['Embalar com parafusos novos identificados e o torque recomendado.']}},
+pt:{n:'PT · prótese total',d:'Prótese total convencional, superior e inferior.',
+ dent:['Moldagem anatômica (1ª etapa) e moldagem funcional com selamento periférico (2ª etapa).','Plano de cera ajustado: dimensão vertical, linha média, linha do sorriso, linha dos caninos e plano oclusal.','Escolha dos dentes: marca e linha (ex.: Delara, Premium), cor, forma e tamanho, e cor da gengiva.','Fotos de face e do sorriso. Se houver, a prótese antiga como referência.','A etapa do trabalho: moldeira, plano, prova de dentes ou acrilização.'],
+ banc:{rec:['Identificar a etapa e conferir moldagem e registros.','Registro incompleto? Avise o dentista antes de seguir.'],
+  mod:['Vazar o modelo de trabalho e confeccionar moldeira individual com alívios, ou base de prova.'],
+  rol:['Plano de cera com altura e espessura padrão, ajustado aos registros.'],
+  mon:['Montar no articulador e posicionar os dentes pelas linhas de referência.','Oclusão balanceada bilateral.','Prova de dentes com o dentista.'],
+  rem:['Ajustes após a prova.'],
+  acr:['Incluir em mufla e polimerizar conforme o fabricante da resina.','Demuflar com cuidado para não fraturar.'],
+  aca:['Remontar e ajustar a oclusão.','Acabamento e polimento, sem bordas cortantes.'],
+  con:['Checklist: oclusão, estabilidade, polimento, sem porosidades, cor conforme o pedido.'],
+  exp:['Embalar em recipiente úmido, com a identificação da OS.']}},
+lente:{n:'Lentes de contato',d:'Laminados cerâmicos (e-max ou feldspática).',
+ dent:['Enceramento diagnóstico ou mock-up aprovado pelo paciente. Sem isso, peça o enceramento ao laboratório antes.','Escaneamento ou moldagem de precisão dos dentes, antagonista e registro de mordida.','Cor do dente preparado (substrato) e cor final desejada.','Fotos com escala, de frente e de lado, e foto do sorriso.','Espessura e translucidez desejadas e caracterizações (halo incisal, mamelos).','Guia de silicone do mock-up, quando houver.'],
+ banc:{rec:['Conferir fotos, cor do substrato e mock-up. Sem fotos e cor, não inicie.'],
+  mod:['Modelo em gesso tipo IV troquelizado ou modelo impresso.'],
+  cad:['Desenhar seguindo o mock-up aprovado.','Respeitar a espessura mínima do material e a linha do sorriso.'],
+  imp:['Imprimir modelo ou prova em resina quando a OS pedir.'],
+  fun:['Injetar a pastilha na translucidez pedida, conforme o fabricante.'],
+  cer:['Fazer cut-back e estratificação incisal ou maquiagem.','Queimas conforme o fabricante. Conferir a cor sobre o substrato.'],
+  aca:['Ajustar contatos e textura de superfície. Brilho natural.'],
+  con:['Checklist: espessura, adaptação, cor sobre o substrato, sem trincas. Manuseie com cuidado.'],
+  exp:['Embalar cada lente separada e identificada pelo dente, em embalagem rígida.']}}};
+const POP_ORDER=['coroa','psi','protocolo','pt','lente'];
+const popGet=k=>{const d=POP_DEF[k],o=(S.settings.pops||{})[k]||{};return{...d,dent:o.dent||d.dent,banc:{...d.banc,...(o.banc||{})}}};
+function popType(svc){if(!svc)return null;if(svc.pop)return svc.pop==='none'?null:svc.pop;const n=(svc.name||'')+' '+(svc.cat||'');
+  if(/lente|laminad|faceta/i.test(n))return'lente';if(/protocolo/i.test(n))return'protocolo';if(/^PT\b|prótese total/i.test(svc.name||''))return'pt';
+  if(/implant|munh|barra|link|ti-base|análogo|parafus/i.test(n))return'psi';if(/coroa|zirc|e-?max|inlay|onlay|pmma|elemento|metalocer/i.test(n))return'coroa';return null}
+const popStages=(k,svc)=>{const P=popGet(k),order=STAGES.map(s=>s.id),st=svc&&svc.stages&&svc.stages.length?svc.stages:order;return order.filter(id=>P.banc[id]&&(!svc||st.includes(id)))};
+const popEdit=()=>can('admin')||can('cad');
+function popDentText(k,cl){const P=popGet(k);return`Olá${cl&&cl.name?', '+cl.name:''}! Para o trabalho de ${P.n.toLowerCase()}, precisamos de:\n${P.dent.map(x=>'• '+x).join('\n')}\nCom tudo isso, o trabalho entra direto em produção, sem atraso.\n${S.settings.lab||''}`.trim()}
+/* ---------- tela POPs (Produção) ---------- */
+V.pops=()=>{const k=UI.popK=POP_ORDER.includes(UI.popK)?UI.popK:'coroa',P=popGet(k),aud=UI.popAud=UI.popAud==='banc'?'banc':'dent',ed=popEdit(),cus=!!(S.settings.pops||{})[k];
+  const svcs=listOf('services').filter(s=>popType(s)===k).map(s=>s.name);
+  const list=(arr,key)=>ed?`<textarea data-pop-k="${k}" data-pop-f="${key}" rows="${Math.max(3,arr.length+1)}" style="font-size:13.5px;line-height:1.5" aria-label="Itens, um por linha">${esc(arr.join('\n'))}</textarea>`:`<ul style="margin:0;padding-left:18px;line-height:1.6">${arr.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+  const body=aud==='dent'?`<section class="panel"><div class="sec-h"><h2 style="margin:0">O que o dentista precisa enviar</h2><div class="toolbar" style="margin:0"><button class="btn" data-pop-copy="${k}" type="button">Copiar para WhatsApp</button></div></div>
+      <p class="sub" style="margin:6px 0 12px">Mande para o dentista antes do primeiro trabalho, ou quando chegar pedido incompleto.${ed?' Um item por linha.':''}</p>${list(P.dent,'dent')}</section>`
+    :popStages(k).map(st=>`<section class="panel"><h2 style="margin:0 0 8px">${esc(SN[st]||st)}</h2>${list(P.banc[st],'banc.'+st)}</section>`).join('');
+  return head('POPs','Procedimentos padrão por tipo de trabalho: o que o dentista envia e como cada setor da bancada executa.',`<button class="btn primary" data-pop-pdf="${k}" type="button">PDF deste POP</button>${ed&&cus?`<button class="btn ghost" data-pop-reset="${k}" type="button">Voltar ao texto padrão</button>`:''}`)+
+  `<div class="toolbar">${seg('popK',POP_ORDER.map(x=>[x,POP_DEF[x].n]))}</div>
+  <p class="note" style="margin-bottom:12px"><b>${esc(P.n)}:</b> ${esc(P.d)}${svcs.length?` Usado em: ${esc(svcs.join(', '))}.`:''} Temperaturas, programas de forno, resinas e torques seguem sempre as instruções do fabricante.</p>
+  <div class="toolbar">${seg('popAud',[['dent','Para o dentista'],['banc','Na bancada (por setor)']])}</div>`+body};
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.popK)return;const k=t.dataset.popK,f=t.dataset.popF,lines=t.value.split('\n').map(x=>x.trim()).filter(Boolean);
+  const all=S.settings.pops=S.settings.pops||{},o=all[k]=all[k]||{};if(f==='dent')o.dent=lines;else{o.banc=o.banc||{};o.banc[f.slice(5)]=lines}save();toast('POP salvo')});
+/* ---------- POP da OS (modal) ---------- */
+function popOpen(o){const svc=svcOf(o),k=popType(svc);if(!k){toast('Este serviço ainda não tem POP. Veja Produção → POPs.');return}
+  const P=popGet(k),cur=curStage(o),sts=popStages(k,svc);
+  openModal(`<div class="sheet-head"><div><span class="mono mut">OS ${o.num} · ${esc(svc.name)}</span><h2>POP · ${esc(P.n)}</h2></div><button class="btn ghost" data-act="close" aria-label="Fechar">✕</button></div>
+  <div class="grid" style="gap:10px">${sts.map(st=>`<section style="border:1px solid ${st===cur?'var(--accent)':'var(--line)'};border-radius:10px;padding:10px 14px${st===cur?';background:var(--accent-soft)':''}"><b>${esc(SN[st]||st)}${st===cur?' · etapa atual':''}</b><ul style="margin:6px 0 0;padding-left:18px;line-height:1.55;font-size:13.5px">${P.banc[st].map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}
+  <details><summary style="cursor:pointer;font-weight:600">O que o dentista deveria ter enviado</summary><ul style="margin:6px 0 0;padding-left:18px;line-height:1.55;font-size:13.5px">${P.dent.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+  <div class="toolbar" style="margin:8px 0 0"><button class="btn sm" data-pop-copy="${k}" data-pop-cli="${o.client}" type="button">Copiar lista para o dentista</button></div></details></div>
+  <div class="sheet-foot"><span></span><div style="display:flex;gap:8px"><button class="btn" data-pop-pdf="${k}" data-pop-svc="${svc.id}" type="button">PDF do POP</button><button class="btn primary" data-act="close">Fechar</button></div></div>`)}
+/* ---------- PDF ---------- */
+async function popPdf(k,svcId){let b;try{const P=pdfMake(false),D=popGet(k),M=P.M,W=P.PW-2*M,ink=[20,34,42],mut=[88,104,111],teal=[11,122,117],svc=svcId?find('services',svcId):null;
+  const H=(s,sz=13)=>{P.room(sz*2.4);P.y+=sz*1.5;P.text(s,M,P.y,sz,{b:1,c:ink});P.y+=6};
+  const li=(s)=>{const L=pdfWrap(pdfTx(s),W-16,9.5);P.room(L.length*13+2);L.forEach((l,i)=>{P.y+=13;if(!i)P.text('•',M+2,P.y,9.5,{b:1,c:teal});P.text(l,M+14,P.y,9.5,{c:ink})});P.y+=3};
+  P.text(S.settings.lab||'CERIONE',M,P.y+12,11,{b:1});P.text('POP · PROCEDIMENTO OPERACIONAL PADRÃO',M+W,P.y+10,7,{b:1,c:mut,align:'right'});P.y+=26;
+  P.text(D.n+(svc?' · '+svc.name:''),M,P.y+16,18,{b:1});P.y+=24;pdfWrap(pdfTx(D.d),W,9).forEach(l=>{P.y+=12;P.text(l,M,P.y,9,{c:mut})});P.y+=10;P.rect(M,P.y,W,1.2,ink);P.y+=4;
+  H('1. O que o dentista precisa enviar');D.dent.forEach(li);
+  H('2. Execução na bancada, por setor');popStages(k,svc).forEach(st=>{P.room(40);P.y+=14;P.text(SN[st]||st,M,P.y,10.5,{b:1,c:teal});P.y+=2;D.banc[st].forEach(li)});
+  P.y+=8;pdfWrap('Temperaturas, programas de forno, resinas, cimentos e torques seguem sempre as instruções do fabricante de cada material.',W,8).forEach(l=>{P.room(12);P.y+=11;P.text(l,M,P.y,8,{c:mut})});
+  b=P.blob(`${S.settings.lab||'CERIONE'} · POP ${D.n} · emitido em ${new Date().toLocaleDateString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar o PDF');return}
+  await relSave(`pop-${k}.pdf`,b,'application/pdf')}
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-pop-pdf],[data-pop-copy],[data-pop-reset],[data-pop]');if(!t)return;const d=t.dataset;
+  if(d.pop){const o=find('orders',d.pop);if(o)popOpen(o.parent?find('orders',o.parent)||o:o)}
+  else if(d.popPdf)popPdf(d.popPdf,d.popSvc);
+  else if(d.popCopy){const txt=popDentText(d.popCopy,d.popCli?cliOf(d.popCli):null);try{navigator.clipboard.writeText(txt).then(()=>toast('Lista copiada. Cole no WhatsApp do dentista.'),()=>copyText(txt,''))}catch(er){copyText(txt,'')}}
+  else if(d.popReset){if(S.settings.pops)delete S.settings.pops[d.popReset];save();render();toast('Texto padrão restaurado')}});
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}
