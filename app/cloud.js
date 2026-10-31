@@ -193,7 +193,7 @@ async function loadMembers(){const{data}=await C.sb.from('lab_members').select('
 function applyUsers(){const mt=S.memberTeam||{};S.users=C.members.map(m=>({id:m.user_id,name:m.name||m.email||'Usuário',email:m.email,role:m.role,team:mt[(m.email||'').toLowerCase()]||null,active:true,pin:''}));
   if(!S.users.some(u=>u.id===C.user.id))S.users.push({id:C.user.id,name:'Suporte CERIONE',email:C.user.email,role:'dono',active:true,pin:''});CUR=C.user.id}
 async function openLab(lab){C.lab=lab;C.role=lab.role;screen('<p class="sub">Carregando dados do laboratório…</p>');
-  try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:lab.id});C.st=(Array.isArray(st)?st[0]:st)||{status:lab.status,can_write:true};if(C.role==='dono_suporte')C.st={...C.st,can_write:false,support:true};await loadMembers();try{const{data:fe}=await C.sb.rpc('my_lab_features',{p_lab:lab.id});if(fe){window.CERIONE_FEATURES=Array.isArray(fe.modules)?fe.modules:null;window.CERIONE_PLAN=fe}}catch(e){}try{if(window.waReset)waReset()}catch(e){}
+  try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:lab.id});C.st=(Array.isArray(st)?st[0]:st)||{status:lab.status,can_write:true};if(C.role==='dono_suporte')C.st={...C.st,can_write:false,support:true};await loadMembers();await loadBill();try{const{data:fe}=await C.sb.rpc('my_lab_features',{p_lab:lab.id});if(fe){window.CERIONE_FEATURES=Array.isArray(fe.modules)?fe.modules:null;window.CERIONE_PLAN=fe}}catch(e){}try{if(window.waReset)waReset()}catch(e){}
     let docs=await loadDocs();
     if(!Object.keys(docs).length){if(C.role!=='dono'){screen(`<div class="msg">O dono do laboratório ainda não fez o primeiro acesso. Tente de novo mais tarde.</div><button class="btn" data-out="1">Sair</button>`);return}
       const d=await firstRunScreen();S=d||emptyData();if(!S.invoices)S.invoices=[];if(!S.posted)S.posted={fix:[],com:[]};migrate();if(!S.fichasV)importCatalog();if(!d)S.settings.lab=lab.name;{const st=S.settings,fmtD=c=>(c=String(c||'').replace(/\D/g,''),c.length===14?c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):c),A=lab.address||{};if(!st.doc&&lab.cnpj)st.doc=fmtD(lab.cnpj);if(!st.city&&lab.city)st.city=lab.city;if(!st.uf&&lab.uf)st.uf=lab.uf;if(!st.phone&&lab.phone)st.phone=MASK.tel(lab.phone);if(!st.legalName&&lab.legal_name)st.legalName=lab.legal_name;if(!st.address&&A.street)st.address=[A.street,A.number].filter(Boolean).join(', ')+(A.district?' - '+A.district:'')+(A.cep?' · CEP '+MASK.cep(A.cep):'')}delete S.demoAutoV;S.demoAutoV=5;
@@ -247,6 +247,65 @@ async function histModal(){const{data,error}=await C.sb.rpc('list_history',{p_la
 /* ---------- GESTÃO CERIONE: painel em admin.js ---------- */
 const LABMODE='cl-labmode';
 function adminScreen(){try{sessionStorage.removeItem(LABMODE)}catch(e){}return window.CERIONE_ADMIN.open()}
+/* ---------- plano, assinatura e faturas (cobrança automática pelo Asaas) ---------- */
+const BRL=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const dBR=d=>d?String(d).slice(8,10)+'/'+String(d).slice(5,7)+'/'+String(d).slice(0,4):'—';
+const canBill=()=>['dono','fin'].includes(C.role);
+async function cob(action,body){const{data,error}=await C.sb.functions.invoke('cobranca',{body:{action,lab:C.lab&&C.lab.id,...(body||{})}});
+  if(error){let j={};try{j=await error.context.json()}catch(e){}const er=new Error(j.error||error.message||'erro');Object.assign(er,{detail:j.detail,max:j.max,members:j.members});throw er}return data||{}}
+window.CERIONE_COB=cob;
+const cobErr=e=>({asaas_not_configured:'A cobrança automática ainda não foi ativada pelo CERIONE. Fale com o suporte.',asaas_error:'O Asaas recusou a operação: '+(e.detail||'erro'),
+  too_many_users:`Este plano permite até ${e.max} usuários e o laboratório tem ${e.members}. Escolha um plano maior ou remova acessos.`,missing_cnpj:'Cadastre o CNPJ do laboratório antes de assinar (fale com o suporte).',
+  invalid_plan:'Plano inválido.',forbidden:'Só o dono do laboratório pode assinar.',lab_unavailable:'Este laboratório está cancelado.',no_subscription:'Este laboratório ainda não tem assinatura.'}[e.message]||errTxt(e));
+async function loadBill(){C.bill=null;if(!C.lab||!canBill())return;try{const{data}=await C.sb.rpc('my_billing',{p_lab:C.lab.id});C.bill=data||null}catch(e){}}
+async function reloadLabState(){try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:C.lab.id});const s=(Array.isArray(st)?st[0]:st);if(s)C.st={...C.st,...s}}catch(e){}
+  try{const{data:fe}=await C.sb.rpc('my_lab_features',{p_lab:C.lab.id});if(fe){window.CERIONE_FEATURES=Array.isArray(fe.modules)?fe.modules:null;window.CERIONE_PLAN=fe}}catch(e){}await loadBill()}
+const trialLeft=B=>B&&B.status==='trial'&&B.trial_end?Math.round((Date.parse(B.trial_end)-Date.parse(new Date(Date.now()-3*36e5).toISOString().slice(0,10)))/864e5):null;
+const openInv=B=>((B&&B.payments)||[]).filter(p=>p.status==='aberto'&&p.invoice_url).sort((a,b)=>a.due_date.localeCompare(b.due_date))[0]||null;
+function billBanner(){const B=C.bill,ro=C.st&&!C.st.can_write,dono=C.role==='dono',inv=openInv(B);
+  const btn=inv&&inv.invoice_url?` <a class="btn sm primary" href="${h(inv.invoice_url)}" target="_blank" rel="noopener" data-inv-open="1">Pagar a fatura de ${BRL(inv.amount)}</a>`:'';
+  const sub=dono&&B&&!B.subscribed?` <button class="btn sm primary" data-cl="sub">Assinar agora</button>`:'';
+  if(ro){if(C.st.support)return'<div class="ro-banner"><b>Modo suporte:</b> você está vendo os dados deste laboratório somente para consulta.</div>';const tl=trialLeft(B);
+    const why=C.st.status==='trial'||(tl!==null&&tl<0)?'<b>Período de teste encerrado:</b> seus dados estão guardados e você pode consultar tudo, mas para lançar e editar é preciso assinar.':C.st.status==='bloqueado'||inv&&inv.overdue?'<b>Acesso limitado por falta de pagamento:</b> o laboratório está em modo somente leitura até a fatura ser paga. Pix e cartão liberam na hora.':'<b>Acesso limitado:</b> o laboratório está em modo somente leitura.';
+    const act=dono||C.role==='fin'?(btn||sub||(dono?' Fale com o CERIONE para ativar o plano.':' Fale com o dono do laboratório.')):' Fale com o dono do laboratório.';return`<div class="ro-banner">${why}${act}</div>`}
+  if(!B)return'';const tl=trialLeft(B);
+  if(inv&&inv.overdue)return`<div class="ro-banner"><b>Fatura vencida em ${dBR(inv.due_date)}.</b> Para não ficar em modo somente leitura, pague em até ${B.grace_days} dias do vencimento.${btn}</div>`;
+  if(tl!==null&&tl<=5&&dono&&!B.subscribed)return`<div class="ro-banner"><b>Seu teste grátis termina ${tl<=0?'hoje':tl===1?'amanhã':'em '+tl+' dias'}.</b> Assine agora para continuar sem interrupção: a primeira fatura só vence no fim do teste.${sub}</div>`;
+  return''}
+function billPanel(){const B=C.bill;if(!B)return'';const tl=trialLeft(B),dono=C.role==='dono';
+  const stTxt={trial:tl!==null&&tl>=0?`Teste grátis · ${tl} dia(s)`:'Teste encerrado',ativo:'Ativo',atrasado:'Pagamento atrasado',bloqueado:'Bloqueado (só leitura)',cancelado:'Cancelado'}[B.status]||B.status;
+  const rows=(B.payments||[]).map(p=>{const s=p.status==='pago'?['done','Pago '+dBR(p.paid_at)]:p.overdue?['late','Vencida']:['soon','Em aberto'];
+    return`<tr><td>${dBR(p.due_date)}</td><td class="n">${BRL(p.amount)}</td><td><span class="pill ${s[0]}">${s[1]}</span></td><td class="n">${p.invoice_url?`<a class="btn sm ${p.status==='pago'?'ghost':'primary'}" href="${h(p.invoice_url)}" target="_blank" rel="noopener">${p.status==='pago'?'Ver recibo':'Pagar'}</a>`:''}</td></tr>`});
+  return`<section class="panel" id="cl-bill"><div class="sec-h"><h2 style="margin:0">Plano e assinatura</h2><div style="display:flex;gap:8px">${B.subscribed?'<button class="btn sm ghost" data-cl="bill-ref">Atualizar</button>':''}${dono&&B.status!=='cancelado'?`<button class="btn sm primary" data-cl="sub">${B.subscribed?'Mudar plano':'Assinar agora'}</button>`:''}</div></div>
+  <div class="costbox" style="margin:8px 0 12px"><div><span class="k">Plano</span><span class="v">${h(B.plan_name||'—')}</span></div><div><span class="k">Situação</span><span class="v">${h(stTxt)}</span></div>
+   <div><span class="k">Valor</span><span class="v">${B.subscribed||B.status!=='trial'?BRL(B.charge)+(B.cycle==='YEARLY'?' por ano':' por mês'):'—'}</span></div><div><span class="k">Usuários</span><span class="v">${B.members}${B.max_users?' de '+B.max_users:''}</span></div></div>
+  ${B.subscribed?tbl(['Vencimento','#Valor','Situação',''],rows,'Nenhuma fatura ainda.'):`<p class="sub" style="margin:0">${B.status==='trial'?'Durante o teste tudo fica liberado. Ao assinar, a primeira fatura só vence no fim do teste.':'Este laboratório ainda não tem assinatura automática.'}</p>`}
+  <p class="mut" style="font-size:12px;margin:10px 0 0">Pagamento por Pix, boleto ou cartão, pelo Asaas. Pix e cartão confirmam na hora; boleto em até 3 dias úteis. Fatura vencida há mais de ${B.grace_days} dias deixa o sistema só para consulta até o pagamento.</p></section>`}
+async function subModal(){let pr=null;try{const{data}=await C.sb.rpc('public_pricing');pr=data}catch(e){}if(!pr||!pr.plans){toast('Não foi possível carregar os planos');return}
+  await loadBill();const B=C.bill||{},plans=pr.plans.filter(p=>+p.price>0),feats=(pr.features||[]).filter(f=>f.kind!=='base');
+  let sel=(plans.find(p=>p.id===B.plan)||plans[1]||plans[0]).id,cyc=B.cycle||'MONTHLY',pay='UNDEFINED';const mine=new Set(B.modules||[]),add=new Set();
+  {const P0=plans.find(p=>p.id===sel);if(B.subscribed&&P0)feats.forEach(f=>{if(mine.has(f.id)&&!(P0.modules||[]).includes(f.id))add.add(f.id)})}
+  openModal(mhead(B.subscribed?'Mudar plano':'Assinar o CERIONE')+'<div id="sb-box" class="grid"></div>',false);
+  const draw=()=>{const P=plans.find(p=>p.id===sel),inc=P.modules||feats.map(f=>f.id),extra=feats.filter(f=>!inc.includes(f.id));[...add].forEach(id=>{if(inc.includes(id))add.delete(id)});
+    const base=+P.price+extra.filter(f=>add.has(f.id)).reduce((a,f)=>a+ +f.price,0),disc=+B.discount_pct||0,mon=base*(1-disc/100),charge=cyc==='YEARLY'?mon*10:mon,tl=trialLeft(B);
+    $('sb-box').innerHTML=`<div class="field"><label>Plano</label><div style="display:grid;gap:8px">${plans.map(p=>{const over=p.max_users&&B.members>p.max_users;return`<label class="checks" style="display:flex;flex-wrap:nowrap;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px 12px;${p.id===sel?'border-color:var(--zir,#0B7A75);box-shadow:0 0 0 1px var(--zir,#0B7A75)':''};${over?'opacity:.55':''}"><input type="radio" name="sb-plan" value="${h(p.id)}" ${p.id===sel?'checked':''} ${over?'disabled':''} style="flex:none;margin-top:3px"><span style="flex:1;min-width:0"><b>${h(p.name)}</b> · ${BRL(p.price)}/mês · ${p.max_users?'até '+p.max_users+' usuários':'usuários ilimitados'}<span class="mut" style="display:block;font-size:12.5px">${h(p.description||'')}${over?` · seu laboratório tem ${B.members} usuários`:''}</span></span></label>`}).join('')}</div></div>
+     ${extra.length?`<div class="field"><label>Adicionais (opcional)</label><div style="display:grid;gap:6px">${extra.map(f=>`<label class="checks"><input type="checkbox" data-sb-add="${h(f.id)}" ${add.has(f.id)?'checked':''}> ${h(f.name)} · +${BRL(f.price)}/mês</label>`).join('')}</div></div>`:''}
+     <div class="form-grid"><div class="field"><label for="sb-cyc">Ciclo</label><select id="sb-cyc"><option value="MONTHLY" ${cyc==='MONTHLY'?'selected':''}>Mensal</option><option value="YEARLY" ${cyc==='YEARLY'?'selected':''}>Anual · 2 meses grátis</option></select></div>
+      <div class="field"><label for="sb-pay">Forma de pagamento</label><select id="sb-pay">${[['UNDEFINED','Escolher na hora (Pix, boleto ou cartão)'],['PIX','Pix'],['BOLETO','Boleto'],['CREDIT_CARD','Cartão de crédito']].map(([k,n])=>`<option value="${k}" ${k===pay?'selected':''}>${n}</option>`).join('')}</select></div></div>
+     <div class="costbox"><div><span class="k">${cyc==='YEARLY'?'Valor por ano':'Valor por mês'}</span><span class="v" id="sb-total">${B.custom_price?BRL(B.charge):BRL(charge)}</span></div>${disc&&!B.custom_price?`<div><span class="k">Desconto</span><span class="v">${disc}% aplicado</span></div>`:''}${cyc==='YEARLY'&&!B.custom_price?`<div><span class="k">Equivale a</span><span class="v">${BRL(charge/12)}/mês</span></div>`:''}</div>
+     ${B.custom_price?'<p class="mut" style="font-size:12.5px;margin:0">Seu laboratório tem um valor especial combinado com o CERIONE; a fatura usa esse valor.</p>':''}
+     <p class="sub" style="margin:0;font-size:13px">${B.subscribed?'O novo valor vale a partir da próxima fatura em aberto.':tl!==null&&tl>0?`A primeira fatura vence em ${dBR(B.trial_end)}, no fim do teste. Até lá tudo continua liberado.`:'A primeira fatura vence hoje. O acesso completo volta assim que o pagamento for confirmado.'}</p>
+     <div class="sheet-foot"><span class="err" id="sb-err"></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn primary" id="sb-go" type="button">${B.subscribed?'Salvar mudança':'Assinar'}</button></div></div>`;
+    $('sb-box').querySelectorAll('[name=sb-plan]').forEach(i=>i.addEventListener('change',()=>{sel=i.value;draw()}));
+    $('sb-box').querySelectorAll('[data-sb-add]').forEach(i=>i.addEventListener('change',()=>{i.checked?add.add(i.dataset.sbAdd):add.delete(i.dataset.sbAdd);draw()}));
+    $('sb-cyc').addEventListener('change',e=>{cyc=e.target.value;draw()});$('sb-pay').addEventListener('change',e=>{pay=e.target.value});
+    $('sb-go').addEventListener('click',async()=>{const b=$('sb-go');b.disabled=true;$('sb-err').textContent='';b.textContent='Criando no Asaas…';
+      try{const r=await cob('subscribe',{plan:sel,addons:[...add],cycle:cyc,billing:pay});await reloadLabState();render();
+        openModal(mhead(B.subscribed?'Plano alterado':'Assinatura criada')+`<div class="grid"><p style="margin:0">Valor: <b>${BRL(r.value)}</b> ${r.cycle==='YEARLY'?'por ano':'por mês'}. ${r.invoice_url?`Próxima fatura: vencimento em <b>${dBR(r.due_date)}</b>.`:''}</p>
+          ${r.invoice_url?`<a class="btn primary" href="${h(r.invoice_url)}" target="_blank" rel="noopener" style="justify-content:center">Abrir a fatura (Pix, boleto ou cartão)</a>`:''}<p class="mut" style="font-size:12.5px;margin:0">As faturas também ficam em Configurações → Plano e assinatura, e o Asaas envia cada uma por e-mail.</p>
+          <div class="sheet-foot"><span></span><button class="btn" data-act="close">Fechar</button></div></div>`,true)}
+      catch(err){b.disabled=false;b.textContent=B.subscribed?'Salvar mudança':'Assinar';$('sb-err').textContent=cobErr(err)}})};
+  draw()}
 window.CERIONE_CONTA=conta;
 C.ui={MARK,openLab:l=>{try{sessionStorage.setItem(LABMODE,'1')}catch(e){}return openLab(l)},labsFromAdmin:async()=>{const labs=await myLabs();pickScreen(labs)}};
 /* ---------- eventos ---------- */
@@ -255,7 +314,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-cl],
   const a=b.dataset.cl||'out';e.stopPropagation();
   if(a==='out'){await push(true);await C.sb.auth.signOut();localStorage.removeItem(LAST);try{sessionStorage.removeItem('cl-labmode')}catch(e){}location.reload()}
   else if(a==='labs'){await push(true);localStorage.removeItem(LAST);try{sessionStorage.removeItem(LABMODE)}catch(e){}location.reload()}
-  else if(a==='hist')histModal();else if(a==='inv-new')invite();
+  else if(a==='hist')histModal();else if(a==='sub')subModal();else if(a==='bill-ref'){b.disabled=true;try{await cob('refresh');await reloadLabState();render();toast('Faturas atualizadas')}catch(err){toast(cobErr(err))}b.disabled=false}else if(a==='inv-new')invite();
   else if(a==='restore'){const{error}=await C.sb.rpc('restore_history',{p_lab:C.lab.id,p_id:+b.dataset.h});if(error){toast(errTxt(error));return}const docs=await loadDocs();S=merge(docs);migrate();applyUsers();Object.keys(AREAS).forEach(x=>C.sent[x]=J(split()[x]));closeModal();render();toast('Área restaurada da cópia escolhida')}
   else if(a==='rm'){const{error}=await C.sb.rpc('remove_member',{p_lab:C.lab.id,p_user:b.dataset.u});toast(error?errTxt(error):'Pessoa removida do laboratório');await loadMembers();applyUsers();render()}
 },true);
@@ -289,8 +348,9 @@ C.boot=function(){if(!window.supabase||!CFG.url){screen('<div class="msg err">Co
   C.sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   window.save=save=function(){try{auditDiff()}catch(e){}if(C.lab){if(C.st&&!C.st.can_write){setStatus('ro');return}setStatus('saving');schedule()}};
   window.cfgAccess=cfgAccess=function(){return cloudAccess()};
+  if(typeof cfgPlan==='function'){const _cp=cfgPlan;window.cfgPlan=cfgPlan=function(){const base=_cp();return C.bill?billPanel()+(C.role==='dono'?base.replace('Para contratar outros, fale com o CERIONE.','Para contratar outros, use “Mudar plano” acima.'):base):base}}
   window.teamLoginCell=teamLoginCell=function(t){if(!can('admin'))return'';const em=Object.entries(S.memberTeam||{}).find(([e,id])=>id===t.id);return em?`<span class="pill ok">login: ${h(em[0])}</span>`:`<button class="btn sm" data-cl="inv-new">Convidar por e-mail</button>`};
-  const _render=render;window.render=render=function(){if(!C.lab)return;_render();if(C.st&&!C.st.can_write&&$('main')){$('main').insertAdjacentHTML('afterbegin',`<div class="ro-banner"><b>${C.st.status==='trial'?'Período de teste encerrado':'Acesso limitado'}:</b> o laboratório está em modo somente leitura. ${C.role==='dono'?'Fale com o CERIONE para ativar o plano.':'Fale com o dono do laboratório.'}</div>`)}};
+  const _render=render;window.render=render=function(){if(!C.lab)return;_render();{const bn=billBanner();if(bn&&$('main'))$('main').insertAdjacentHTML('afterbegin',bn)}};
   C.sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY')newPassScreen()});
   window.addEventListener('beforeunload',e=>{if(C.lab&&C.timer){push(true)}});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')push(true);else refreshIfNewer()});
