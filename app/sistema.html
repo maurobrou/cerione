@@ -878,7 +878,7 @@ const ROLES={dono:{n:'Dono / Admin',d:'Acesso total, usuários, auditoria e dado
  fin:{n:'Financeiro',d:'Caixa, receber, pagar, faturas, fechamento, notas e relatórios. Vê custos sem alterar.',p:['painel','fin','com','cad_v','compras_v','compras','cli','est_v','os_v','prod','rel','valores','preco']},
  rec:{n:'Recepção',d:'Abre e edita OS, cadastra dentistas, mensagens e estoque. Vê valores, não altera preço nem financeiro.',p:['painel','cli','est_v','estoque','os_v','os','prod','rel','valores','compras_v']},
  tec:{n:'Técnico',d:'Vê só as próprias OS e etapas (quando ligado a um profissional da equipe) e conclui as etapas dele. Não vê valores.',p:['os_v','prod','etapa','est_v','rel']}};
-const VIEW_PERM={pops:'prod',cfo:'fin',reforma:'fin',painel:'painel',caixa:'fin',receber:'fin',fechamento:'fin',pagar:'fin',notas:'fin',resultado:'fin',contas:'fin',relatorios:'fin',comissoes:'com',servicos:'cad_v',equipe:'cad_v',config:'admin',audit:'admin',fornecedores:'compras_v',clientes:'cli',mensagens:'cli',estoque:'est_v',trabalhos:'os_v',producao:'prod',rel:'rel'};
+const VIEW_PERM={portal:'os',pops:'prod',cfo:'fin',reforma:'fin',painel:'painel',caixa:'fin',receber:'fin',fechamento:'fin',pagar:'fin',notas:'fin',resultado:'fin',contas:'fin',relatorios:'fin',comissoes:'com',servicos:'cad_v',equipe:'cad_v',config:'admin',audit:'admin',fornecedores:'compras_v',clientes:'cli',mensagens:'cli',estoque:'est_v',trabalhos:'os_v',producao:'prod',rel:'rel'};
 const ACT_PERM={'rec-pay':'fin','pay-pay':'fin','pp-open':'fin','fin-undo':'fin','inv-new':'fin','inv-del':'fin','ip-edit':'fin','fc-inv':'fin','fc-all':'fin','fc-edit':'fin','fc-target':'fin','fc-zero':'fin','post-fixed':'fin','post-comm':'fin','dun-copy':'fin','new':'os','ord-edit':'os','ord-cancel':'os','nx-add':'os','adv':'etapa','back':'etapa','cli-form':'cli','demo-gen':'admin','rc-all':'admin','tl-new':'admin','tl-pin':'admin','tl-off':'admin','pin-copy':'admin'};
 const FORM_PERM={invForm:'fin',ipForm:'fin',recForm:'fin',ppForm:'fin',cmForm:'fin',accForm:'fin',reschForm:'fin',nfeForm:'compras',noForm:'os',cliForm:'cli',svcForm:'cad',addFixed:'cad',addEquip:'cad',addTeam:'cad',matForm:'estoque',chAdd:'fin',usForm:'admin'};
 const UKEY='labline-user';
@@ -957,7 +957,7 @@ doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/>',search:'<c
 const ico=(k,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
 const MODS_ALL=[
  {id:'inicio',n:'Início',ic:'home',d:'Resumo do dia: produção, financeiro e pendências.',items:[['painel','Painel']]},
- {id:'producao',n:'Produção',ic:'tooth',d:'Ordens de serviço e o andamento de cada etapa.',items:[['trabalhos','Trabalhos (OS)'],['producao','Quadro de produção'],['pops','POPs']]},
+ {id:'producao',n:'Produção',ic:'tooth',d:'Ordens de serviço e o andamento de cada etapa.',items:[['trabalhos','Trabalhos (OS)'],['producao','Quadro de produção'],['portal','Pedidos do portal'],['pops','POPs']]},
  {id:'clientes',n:'Clientes',ic:'users',d:'Dentistas, condições comerciais e mensagens.',items:[['clientes','Dentistas'],['mensagens','Mensagens']]},
  {id:'fin',n:'Financeiro',ic:'wallet',d:'Caixa, contas a receber e a pagar, fechamento e notas de serviço.',items:[['caixa','Fluxo de caixa'],['fechamento','Fechamento mensal'],['receber','Contas a receber'],['pagar','Contas a pagar'],['notas:saida','Notas fiscais (NFS-e)']]},
  {id:'estoque',n:'Estoque e compras',ic:'box',d:'Materiais, movimentações, notas de compra e fornecedores.',items:[['estoque:materiais','Materiais'],['estoque:movs','Movimentações'],['notas:entrada','Notas de compra (XML)'],['fornecedores','Fornecedores']]},
@@ -3865,6 +3865,7 @@ document.addEventListener('change',e=>{const t=e.target;if(t.id==='imp-file'&&t.
  V.clientes=(...a)=>{const s=_vc(...a);return can('cli')||can('admin')?s.replace('<button class="btn primary" data-act="ent-form" data-k="clients">+ Novo cliente</button>','<button class="btn" data-imp-open="clients">Importar planilha</button><button class="btn primary" data-act="ent-form" data-k="clients">+ Novo cliente</button>'):s};
  V.servicos=(...a)=>{const s=_vs(...a);return !(can('preco')||can('admin'))?s:s.replace('<button class="btn primary" data-act="svc-open">+ Novo serviço</button>','<button class="btn" data-imp-open="services">Importar planilha</button><button class="btn primary" data-act="svc-open">+ Novo serviço</button>')};}
 
+V.portal=()=>head('Pedidos do portal','Pedidos que os dentistas enviam pelo portal do laboratório.')+'<section class="panel"><p class="sub" style="margin:0">O portal do dentista funciona na versão online do CERIONE.</p></section>';
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}

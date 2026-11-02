@@ -199,7 +199,7 @@ async function loadMembers(){const{data}=await C.sb.from('lab_members').select('
 function applyUsers(){const mt=S.memberTeam||{};S.users=C.members.map(m=>({id:m.user_id,name:m.name||m.email||'Usuário',email:m.email,role:m.role,team:mt[(m.email||'').toLowerCase()]||null,active:true,pin:''}));
   if(!S.users.some(u=>u.id===C.user.id))S.users.push({id:C.user.id,name:'Suporte CERIONE',email:C.user.email,role:'dono',active:true,pin:''});CUR=C.user.id}
 async function openLab(lab){C.lab=lab;C.role=lab.role;screen('<p class="sub">Carregando dados do laboratório…</p>');
-  try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:lab.id});C.st=(Array.isArray(st)?st[0]:st)||{status:lab.status,can_write:true};if(C.role==='dono_suporte')C.st={...C.st,can_write:false,support:true};await loadMembers();await loadBill();try{const{data:fe}=await C.sb.rpc('my_lab_features',{p_lab:lab.id});if(fe){window.CERIONE_FEATURES=Array.isArray(fe.modules)?fe.modules:null;window.CERIONE_PLAN=fe}}catch(e){}try{if(window.waReset)waReset()}catch(e){}
+  try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:lab.id});C.st=(Array.isArray(st)?st[0]:st)||{status:lab.status,can_write:true};if(C.role==='dono_suporte')C.st={...C.st,can_write:false,support:true};await loadMembers();await loadBill();PT.reqs=null;PT.tok={};await ptLoad();ptPoll();try{const{data:fe}=await C.sb.rpc('my_lab_features',{p_lab:lab.id});if(fe){window.CERIONE_FEATURES=Array.isArray(fe.modules)?fe.modules:null;window.CERIONE_PLAN=fe}}catch(e){}try{if(window.waReset)waReset()}catch(e){}
     let docs=await loadDocs();
     if(!Object.keys(docs).length){if(C.role!=='dono'){screen(`<div class="msg">O dono do laboratório ainda não fez o primeiro acesso. Tente de novo mais tarde.</div><button class="btn" data-out="1">Sair</button>`);return}
       const d=await firstRunScreen();S=d||emptyData();if(!S.invoices)S.invoices=[];if(!S.posted)S.posted={fix:[],com:[]};migrate();if(!S.fichasV)importCatalog();if(!d)S.settings.lab=lab.name;{const st=S.settings,fmtD=c=>(c=String(c||'').replace(/\D/g,''),c.length===14?c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):c),A=lab.address||{};if(!st.doc&&lab.cnpj)st.doc=fmtD(lab.cnpj);if(!st.city&&lab.city)st.city=lab.city;if(!st.uf&&lab.uf)st.uf=lab.uf;if(!st.phone&&lab.phone)st.phone=MASK.tel(lab.phone);if(!st.legalName&&lab.legal_name)st.legalName=lab.legal_name;if(!st.address&&A.street)st.address=[A.street,A.number].filter(Boolean).join(', ')+(A.district?' - '+A.district:'')+(A.cep?' · CEP '+MASK.cep(A.cep):'')}delete S.demoAutoV;S.demoAutoV=5;
@@ -316,6 +316,60 @@ async function subModal(){let pr=null;try{const{data}=await C.sb.rpc('public_pri
           <div class="sheet-foot"><span></span><button class="btn" data-act="close">Fechar</button></div></div>`,true)}
       catch(err){b.disabled=false;b.textContent=B.subscribed?'Salvar mudança':'Assinar';$('sb-err').textContent=cobErr(err)}})};
   draw()}
+/* ---------- portal do dentista: link por dentista e caixa de pedidos ---------- */
+const PT={links:{},tok:{},reqs:null,pending:0,all:false,busy:false,timer:null};
+window.CERIONE_PT={load:()=>ptLoad(),reset:()=>{PT.reqs=null},state:()=>PT};
+const ptCan=()=>['dono','fin','rec'].includes(C.role);
+const ptUrl=tok=>location.origin+'/portal/#t='+tok;
+async function ptLoad(){if(!C.lab)return;try{const{data}=await C.sb.rpc('portal_pending',{p_lab:C.lab.id});PT.pending=+data||0}catch(e){}
+  if(ptCan()){try{const{data}=await C.sb.rpc('portal_link_list',{p_lab:C.lab.id});PT.links=Object.fromEntries((data||[]).map(x=>[x.client_id,x]))}catch(e){}}}
+async function ptReqs(){try{const{data,error}=await C.sb.rpc('portal_requests_list',{p_lab:C.lab.id,p_all:PT.all});if(error)throw error;PT.reqs=data||[]}catch(e){PT.reqs=[];toast('Não foi possível carregar os pedidos do portal')}}
+function ptPoll(){clearInterval(PT.timer);PT.timer=setInterval(async()=>{if(!C.lab||document.visibilityState!=='visible')return;const old=PT.pending;await ptLoad();if(PT.pending>old){toast(`${PT.pending-old} pedido(s) novo(s) pelo portal do dentista`);if(view==='portal'){await ptReqs()}render()}},90000)}
+function ptBanner(){if(!PT.pending||view==='portal'||!['trabalhos','producao','dash','painel'].includes(view)||!(typeof can==='function'&&can('os')))return'';
+  return`<div class="ro-banner" style="background:var(--accent-soft,#D9F3F0);color:inherit"><b>${PT.pending} pedido(s) novo(s) pelo portal do dentista.</b> <button class="btn sm primary" data-act="go" data-v="portal">Ver pedidos</button></div>`}
+function ptSection(cid){const c=cliOf(cid);if(!c||!ptCan())return'';const L=PT.links[cid],tok=PT.tok[cid],ph=String(c.phone||'').replace(/\D/g,'');
+  const link=tok?ptUrl(tok):'',msg=tok?`Olá${c.name?' '+c.name.split(' ').slice(0,2).join(' '):''}! Este é o seu portal no ${S.settings.lab||'laboratório'}: acompanhe cada trabalho em tempo real e envie pedidos novos com fotos e arquivos.\n${link}`:'';
+  return`<section class="panel" id="pt-sec" style="margin-top:12px"><div class="sec-h"><h2 style="margin:0">Portal do dentista</h2>${L?'<span class="pill ok">ativo</span>':''}</div>
+  <p class="sub" style="margin:4px 0 10px">Link exclusivo para ${esc(c.name)} acompanhar as OS, ver o financeiro e enviar pedidos novos com fotos e escaneamentos. Não precisa de senha: quem tem o link acessa, então envie só para o dentista.</p>
+  ${L?`<p class="mut" style="font-size:12.5px;margin:0 0 10px">Criado em ${new Date(L.created_at).toLocaleDateString('pt-BR')} · ${L.last_seen?'último acesso '+new Date(L.last_seen).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'ainda não acessado'} · ${L.views||0} acesso(s)</p>
+   <label class="checks" style="margin-bottom:10px"><input type="checkbox" data-pt-val="${esc(cid)}" ${L.show_values?'checked':''}> Mostrar valores e financeiro no portal</label>`:''}
+  ${tok?`<div class="costbox" style="margin-bottom:10px"><div><span class="k">Link do portal</span><span class="v" style="font-size:12px;word-break:break-all" id="pt-link">${esc(link)}</span></div></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="btn sm primary" data-cl="pt-copy" data-c="${esc(cid)}">Copiar link</button>${ph.length>=10?`<a class="btn sm" href="https://wa.me/55${ph.replace(/^55(?=\d{10,11}$)/,'')}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Enviar pelo WhatsApp</a>`:''}</div>`:''}
+  <div style="display:flex;gap:8px;flex-wrap:wrap">${L?`<button class="btn sm" data-cl="pt-gen" data-c="${esc(cid)}" data-confirm="O link antigo deixa de funcionar. Confirmar?">Gerar novo link</button><button class="btn sm ghost danger" data-cl="pt-off" data-c="${esc(cid)}" data-confirm="Confirmar desativação">Desativar portal</button>`:`<button class="btn sm primary" data-cl="pt-gen" data-c="${esc(cid)}">Criar link do portal</button>`}</div></section>`}
+function ptPaintSec(cid){const s=document.getElementById('pt-sec');if(s)s.outerHTML=ptSection(cid);else{const sh=document.getElementById('sheet');if(sh)sh.insertAdjacentHTML('beforeend',ptSection(cid))}}
+async function ptFile(path){try{const{data,error}=await C.sb.storage.from('portal').createSignedUrl(path,600);if(error)throw error;window.open(data.signedUrl,'_blank','noopener')}catch(e){toast('Não foi possível abrir o arquivo')}}
+function ptView(){if(PT.reqs===null){ptReqs().then(()=>{if(view==='portal')render()});return head('Pedidos do portal','Pedidos que os dentistas enviam pelo portal do laboratório.')+'<section class="panel"><p class="sub" style="margin:0">Carregando pedidos…</p></section>'}
+  const R=PT.reqs,nw=R.filter(r=>r.status==='novo'),fmtD=d=>new Date(d).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const card=r=>{const d=r.data||{},c=cliOf(r.client_id)||{name:'Dentista removido'},s=find('services',d.service);
+    return`<section class="panel" style="border-left:4px solid ${r.status==='novo'?'var(--accent,#0B7A75)':r.status==='aceito'?'var(--ok,#2C7150)':'var(--line)'}"><div class="sec-h" style="align-items:flex-start"><div><h2 style="margin:0">${esc(d.patient||'Paciente')} · ${esc(s?s.name:d.service_name||'Serviço')}</h2><p class="mut" style="margin:2px 0 0;font-size:13px">${esc(c.name)}${c.clinic?' · '+esc(c.clinic):''} · enviado ${fmtD(r.created_at)} · pedido nº ${r.id}</p></div>
+     <span class="pill ${r.status==='novo'?'soon':r.status==='aceito'?'ok':'late'}">${r.status==='novo'?'Novo':r.status==='aceito'?'Virou OS '+(r.order_num||''):'Recusado'}</span></div>
+     <div class="dl" style="margin-top:8px">${d.teeth&&d.teeth.length?`<div><span class="k">Dentes</span>${d.teeth.join(' ')}</div>`:d.qty?`<div><span class="k">Quantidade</span>${d.qty}</div>`:''}${d.shade?`<div><span class="k">Cor</span>${esc(d.shade)}</div>`:''}${d.due?`<div><span class="k">Prazo desejado</span>${dmy(d.due)}</div>`:''}${d.impression?`<div><span class="k">Moldagem</span>${d.impression==='digital'?'Escaneamento digital':'Física'}</div>`:''}${d.remake_of?`<div><span class="k">Ajuste da OS</span>${esc(d.remake_of)}</div>`:''}</div>
+     ${d.urgent||d.pickup?`<p style="margin:8px 0 0">${d.urgent?'<span class="pill late">Urgente</span> ':''}${d.pickup?'<span class="pill soon">Pediu retirada no consultório</span>':''}</p>`:''}
+     ${d.notes?`<p style="margin:8px 0 0;white-space:pre-wrap">${esc(d.notes)}</p>`:''}
+     ${(r.files||[]).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${r.files.map(f=>`<button class="btn sm" data-cl="pt-file" data-path="${esc(f.path)}">📎 ${esc(f.name)}</button>`).join('')}</div>`:''}
+     ${r.reply?`<p class="mut" style="margin:8px 0 0;font-size:13px">Resposta: ${esc(r.reply)}</p>`:''}
+     ${r.status==='novo'?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center"><button class="btn primary" data-cl="pt-os" data-r="${r.id}">Criar OS com este pedido</button><input id="pt-why-${r.id}" placeholder="Motivo, se for recusar" style="flex:1;min-width:180px;max-width:320px"><button class="btn ghost danger" data-cl="pt-no" data-r="${r.id}">Recusar</button></div>`:''}</section>`};
+  return head('Pedidos do portal','Pedidos que os dentistas enviam pelo portal do laboratório. Crie a OS com um clique: os dados já vêm preenchidos.',`<button class="btn" data-cl="pt-all">${PT.all?'Mostrar só os recentes':'Mostrar todos'}</button>`)+
+   `<div class="seg" style="margin-bottom:12px"><span class="mut" style="font-size:13px">${nw.length} novo(s) · ${R.length-nw.length} respondido(s)</span></div>`+
+   (R.length?R.map(card).join(''):`<section class="panel"><p class="sub" style="margin:0">Nenhum pedido ainda. Para começar, abra um dentista em Clientes e crie o link do portal dele.</p></section>`)}
+function ptMakeOS(id){const r=(PT.reqs||[]).find(x=>x.id==id);if(!r)return;const d=r.data||{};if(newOrder()===false)return;
+  const s=find('services',d.service);draft.client=cliOf(r.client_id)?r.client_id:draft.client;if(s)draft.service=s.id;
+  draft.teeth=(d.teeth||[]).map(Number);if(d.qty&&(!s||(s.unit||'elemento')!=='elemento'))draft.qty=d.qty;draft.shade=d.shade||draft.shade;if(d.due)draft.due=d.due;draft.patient=d.patient||'';draft.urgent=!!d.urgent;
+  draft.notes=[`Pedido nº ${r.id} pelo portal do dentista.`,d.remake_of?`Ajuste/retrabalho da OS ${d.remake_of}.`:'',d.impression?`Moldagem: ${d.impression==='digital'?'escaneamento digital':'física'}.`:'',d.pickup?'Pediu retirada no consultório.':'',(r.files||[]).length?`${r.files.length} arquivo(s) anexado(s) no pedido.`:'',d.notes||''].filter(Boolean).join(' ');
+  draft.portalReq=r.id;renderNewOrder()}
+async function ptSet(id,status,reply,num){const{error}=await C.sb.rpc('portal_request_set',{p_lab:C.lab.id,p_id:+id,p_status:status,p_reply:reply||null,p_order_num:num||null});if(error)throw error;
+  const r=(PT.reqs||[]).find(x=>x.id==id);if(r){r.status=status;if(reply)r.reply=reply;if(num)r.order_num=num}PT.pending=Math.max(0,PT.pending-(status!=='novo'?1:0))}
+async function ptAct(a,b){
+  if(a==='pt-gen'){if(b.dataset.confirm&&b.dataset.armed!=='1')return;const cid=b.dataset.c;b.disabled=true;const prev=PT.links[cid];const{data,error}=await C.sb.rpc('portal_link_create',{p_lab:C.lab.id,p_client:cid,p_show_values:prev?prev.show_values:true});
+    if(error){toast(errTxt(error));b.disabled=false;return}PT.tok[cid]=data;await ptLoad();ptPaintSec(cid);toast('Link do portal criado: copie ou envie pelo WhatsApp')}
+  else if(a==='pt-copy'){const tok=PT.tok[b.dataset.c];if(tok)copyText(ptUrl(tok),'Link do portal copiado')}
+  else if(a==='pt-off'){if(b.dataset.armed!=='1')return;const cid=b.dataset.c;const{error}=await C.sb.rpc('portal_link_set',{p_lab:C.lab.id,p_client:cid,p_show_values:null,p_revoke:true});if(error){toast(errTxt(error));return}delete PT.links[cid];delete PT.tok[cid];ptPaintSec(cid);toast('Portal desativado para este dentista')}
+  else if(a==='pt-file')ptFile(b.dataset.path);
+  else if(a==='pt-all'){PT.all=!PT.all;PT.reqs=null;render()}
+  else if(a==='pt-os')ptMakeOS(b.dataset.r);
+  else if(a==='pt-no'){const why=(document.getElementById('pt-why-'+b.dataset.r)||{}).value||'';try{await ptSet(b.dataset.r,'recusado',why||'Pedido não aceito pelo laboratório');render();toast('Pedido recusado; o dentista vê o motivo no portal')}catch(e){toast(errTxt(e))}}}
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||!t.dataset.ptVal)return;const cid=t.dataset.ptVal;const{error}=await C.sb.rpc('portal_link_set',{p_lab:C.lab.id,p_client:cid,p_show_values:t.checked,p_revoke:false});
+  if(error){toast(errTxt(error));t.checked=!t.checked;return}if(PT.links[cid])PT.links[cid].show_values=t.checked;toast(t.checked?'Valores visíveis no portal':'Valores ocultos no portal')});
 window.CERIONE_CONTA=conta;
 C.ui={MARK,openLab:l=>{try{sessionStorage.setItem(LABMODE,'1')}catch(e){}return openLab(l)},labsFromAdmin:async()=>{const labs=await myLabs();pickScreen(labs)}};
 /* ---------- eventos ---------- */
@@ -324,7 +378,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-cl],
   const a=b.dataset.cl||'out';e.stopPropagation();
   if(a==='out'){await push(true);await C.sb.auth.signOut();localStorage.removeItem(LAST);try{sessionStorage.removeItem('cl-labmode')}catch(e){}location.reload()}
   else if(a==='labs'){await push(true);localStorage.removeItem(LAST);try{sessionStorage.removeItem(LABMODE)}catch(e){}location.reload()}
-  else if(a==='hist')histModal();else if(a==='sub')subModal();else if(a==='ref-copy'){copyText(b.dataset.link,'Link de indicação copiado')}else if(a==='bill-ref'){b.disabled=true;try{await cob('refresh');await reloadLabState();render();toast('Faturas atualizadas')}catch(err){toast(cobErr(err))}b.disabled=false}else if(a==='inv-new')invite();
+  else if(a==='hist')histModal();else if(a==='sub')subModal();else if(a.startsWith('pt-'))ptAct(a,b);else if(a==='ref-copy'){copyText(b.dataset.link,'Link de indicação copiado')}else if(a==='bill-ref'){b.disabled=true;try{await cob('refresh');await reloadLabState();render();toast('Faturas atualizadas')}catch(err){toast(cobErr(err))}b.disabled=false}else if(a==='inv-new')invite();
   else if(a==='restore'){const{error}=await C.sb.rpc('restore_history',{p_lab:C.lab.id,p_id:+b.dataset.h});if(error){toast(errTxt(error));return}const docs=await loadDocs();S=merge(docs);migrate();applyUsers();Object.keys(AREAS).forEach(x=>C.sent[x]=J(split()[x]));closeModal();render();toast('Área restaurada da cópia escolhida')}
   else if(a==='rm'){const{error}=await C.sb.rpc('remove_member',{p_lab:C.lab.id,p_user:b.dataset.u});toast(error?errTxt(error):'Pessoa removida do laboratório');await loadMembers();applyUsers();render()}
 },true);
@@ -358,9 +412,12 @@ C.boot=function(){if(!window.supabase||!CFG.url){screen('<div class="msg err">Co
   C.sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   window.save=save=function(){try{auditDiff()}catch(e){}if(C.lab){if(C.st&&!C.st.can_write){setStatus('ro');return}setStatus('saving');schedule()}};
   window.cfgAccess=cfgAccess=function(){return cloudAccess()};
+  V.portal=()=>ptView();
+  if(typeof clientOpen==='function'){const _co=clientOpen;window.clientOpen=clientOpen=function(id){_co(id);if(C.lab)ptPaintSec(id)}}
+  if(typeof createOrder==='function'){const _cr=createOrder;window.createOrder=createOrder=function(){const pr=draft&&draft.portalReq;const o=_cr();if(pr&&o){ptSet(pr,'aceito','',o.num).then(()=>toast('Pedido do portal confirmado: virou a OS '+o.num)).catch(()=>{})}return o}}
   if(typeof cfgPlan==='function'){const _cp=cfgPlan;window.cfgPlan=cfgPlan=function(){const base=_cp();return C.bill?billPanel()+(C.role==='dono'?base.replace('Para contratar outros, fale com o CERIONE.','Para contratar outros, use “Mudar plano” acima.'):base):base}}
   window.teamLoginCell=teamLoginCell=function(t){if(!can('admin'))return'';const em=Object.entries(S.memberTeam||{}).find(([e,id])=>id===t.id);return em?`<span class="pill ok">login: ${h(em[0])}</span>`:`<button class="btn sm" data-cl="inv-new">Convidar por e-mail</button>`};
-  const _render=render;window.render=render=function(){if(!C.lab)return;_render();{const bn=billBanner();if(bn&&$('main'))$('main').insertAdjacentHTML('afterbegin',bn)}};
+  const _render=render;window.render=render=function(){if(!C.lab)return;_render();{const bn=billBanner()+ptBanner();if(bn&&$('main'))$('main').insertAdjacentHTML('afterbegin',bn)}};
   C.sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY')newPassScreen()});
   window.addEventListener('beforeunload',e=>{if(C.lab&&C.timer){push(true)}});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')push(true);else refreshIfNewer()});
