@@ -1034,7 +1034,7 @@ function onboarding(){
 const V={};
 V.painel=()=>{
   const act=S.orders.filter(o=>o.status==='producao');
-  const late=act.filter(o=>daysTo(o.due)<0);
+  const late=act.filter(o=>isLate(o));
   const k=monthKey(0),d=dre(k);
   const recOpen=S.receivables.filter(r=>r.status!=='pago'),recLate=recOpen.filter(r=>daysTo(r.due)<0);
   const payWeek=S.payables.filter(p=>p.status!=='pago'&&daysTo(p.due)<=7);
@@ -1095,9 +1095,9 @@ function techSelect(o,st){
 V.producao=()=>{
   const act=S.orders.filter(o=>o.status==='producao'&&mine(o)&&(!UI.prodTech||defaultTech(o,curStage(o))===UI.prodTech));
   const recent=S.orders.filter(o=>!o.parent&&o.status==='entregue'&&mine(o)&&daysTo(o.delivered)>=-5).sort((a,b)=>b.delivered.localeCompare(a.delivered));
-  const card=o=>{const st=curStage(o);return`<article class="card ${daysTo(o.due)<0?'is-late':''}"><div class="top"><button class="linkbtn" data-act="open" data-id="${o.id}">OS ${o.num}</button>${pill(o)}</div>
+  const card=o=>{const st=curStage(o);return`<article class="card ${isLate(o)?'is-late':''}"><div class="top"><button class="linkbtn" data-act="open" data-id="${o.id}">OS ${o.num}</button>${pill(o)}</div>
     <div class="svc">${esc(svcOf(o).name)}${o.remake?' <span class="chip warn">Retrabalho</span>':''}</div>${kidsTxt(o)?`<div class="mut" style="font-size:12px">+ ${esc(kidsTxt(o))}</div>`:''}<div class="meta"><span>${esc(cliOf(o.client).name)}</span><span class="teeth">${teethTxt(o)}</span><span class="shade">${esc(o.shade)}</span></div>
-    <div class="act">${myTech()?`<span class="mut" style="font-size:12.5px">${myStage(o)?'Com você':esc(techOf(defaultTech(o,st)).name)}</span>`:techSelect(o,st)}${myStage(o)?`<button class="btn sm primary" data-act="adv" data-id="${o.id}">Concluir</button>`:''}</div></article>`};
+    <div class="act">${myTech()?`<span class="mut" style="font-size:12.5px">${myStage(o)?'Com você':esc(techOf(defaultTech(o,st)).name)}</span>`:techSelect(o,st)}${o.prova?'<span class="chip">Com o dentista</span>':myStage(o)?`<button class="btn sm primary" data-act="adv" data-id="${o.id}">Concluir</button>`:''}</div></article>`};
   return head(myTech()?'Minha produção':'Produção',myTech()?`Os trabalhos que estão com você, ${esc(curUser().name)}, e os que você já fez. Ao concluir, o trabalho segue para a próxima etapa.`:'Cada coluna é uma etapa. Ao concluir, o trabalho segue para a próxima etapa e a comissão de quem executou é registrada.',
     '<button class="btn" data-act="scan">Ler QR</button>'+(can('os')||!myTech()?'<button class="btn" data-act="bench-all">Fichas de bancada</button><button class="btn" data-act="qr-all">Etiquetas QR</button>':'')+(myTech()?'':sel('ui-prodTech',[['','Toda a equipe'],...S.team.map(t=>[t.id,t.name])],UI.prodTech,'data-ui="prodTech" aria-label="Filtrar por profissional" style="width:auto"')+(can('os')?'<button class="btn primary" data-act="new">+ Novo trabalho</button>':'')))+
   `<div class="board-wrap"><div class="board">${STAGES.filter(s=>act.some(o=>curStage(o)===s.id)||S.services.some(v=>v.stages.includes(s.id))).map(s=>{const os=act.filter(o=>curStage(o)===s.id).sort((a,b)=>a.due.localeCompare(b.due));return`<section class="col" aria-label="${s.n}"><div class="col-head"><b>${s.n}</b><span>${os.length} · ${os.reduce((a,o)=>a+q(o),0)} el</span></div>${os.map(card).join('')||'<p class="empty">Nada nesta etapa</p>'}</section>`}).join('')}
@@ -1788,7 +1788,7 @@ const REPORTS=[
  run(F){const m={};S.orders.forEach(o=>(o.history||[]).forEach(h=>{if(!inP(h.at,F)||(myTech()&&h.tech!==myTech()))return;const k=h.tech+'|'+h.stage,x=m[k]=m[k]||{t:h.tech,s:h.stage,n:0,el:0,v:0};x.n++;x.el+=+h.elements||0;x.v+=(h.rate||0)*(h.elements||0)}));
  const L=Object.values(m).sort((a,b)=>techOf(a.t).name.localeCompare(techOf(b.t).name)||b.el-a.el);return{cols:[['Profissional','t'],['Função','t'],['Etapa','t'],['Etapas concluídas','n'],['Elementos','n'],['Comissão','m']],rows:L.map(x=>[techOf(x.t).name,techOf(x.t).role||'',SN[x.s]||x.s,x.n,x.el,r2(x.v)]),tot:{3:1,4:1,5:1}}}},
 {id:'atrasos',g:'Produção',n:'Atrasos de entrega',d:'OS entregues depois do prazo e OS em produção com prazo vencido.',f:['cli'],
- run(F){const L=S.orders.filter(o=>!o.parent&&mine(o)&&(!F.cli||o.client===F.cli)&&((o.status==='entregue'&&inP(o.delivered,F)&&o.delivered>o.due)||(o.status==='producao'&&o.due<addDays(0)))).sort((a,b)=>a.due.localeCompare(b.due));
+ run(F){const L=S.orders.filter(o=>!o.parent&&mine(o)&&(!F.cli||o.client===F.cli)&&((o.status==='entregue'&&inP(o.delivered,F)&&o.delivered>o.due)||(o.status==='producao'&&!o.prova&&o.due<addDays(0)))).sort((a,b)=>a.due.localeCompare(b.due));
  return{cols:[['Prazo','d'],['Entregue','d'],['OS','t'],['Dentista','t'],['Serviço','t'],['Situação','t'],['Dias de atraso','n']],rows:L.map(o=>[o.due,o.delivered||'',o.num,cliOf(o.client).name,svcOf(o).name,o.status==='producao'?'Em produção':'Entregue',dd(o.delivered||addDays(0),o.due)])}}},
 {id:'retrab',g:'Produção',n:'Retrabalhos',d:'Retrabalhos do período (sem cobrança e com valores zerados na produção).',f:['cli'],
  run(F){const L=S.orders.filter(o=>o.remake&&mine(o)&&inP(o.created,F)&&(!F.cli||o.client===F.cli));return{cols:[['Data','d'],['OS','t'],['Dentista','t'],['Serviço','t'],['Dentes / qtd.','t'],['Observação','t'],['Situação','t']],rows:L.map(o=>[o.created,o.num,cliOf(o.client).name,svcOf(o).name,teethTxt(o),o.notes||'',RSTAT[o.status]||o.status])}}},
@@ -3230,7 +3230,7 @@ function chatClose(){CH.open=false;document.getElementById('chat-pane').hidden=t
 async function chatSend(){const i=document.getElementById('chat-in'),t=i.value.trim();if(!t)return;if(t.length>2000){toast('Mensagem muito longa (máximo 2.000 caracteres)');return}
   i.value='';i.disabled=true;try{await CHAT.send(t);await chatPull(!CH.last);chatPaint(true)}catch(e){i.value=t;toast('Não foi possível enviar. Verifique a internet.')}finally{i.disabled=false;i.focus()}}
 /* ---------- OS atrasadas ---------- */
-const lateList=()=>S.orders.filter(o=>!o.parent&&o.status==='producao'&&o.due&&daysTo(o.due)<0&&(!myTech()||mine(o))).sort((a,b)=>a.due<b.due?-1:1);
+const lateList=()=>S.orders.filter(o=>!o.parent&&isLate(o)&&(!myTech()||mine(o))).sort((a,b)=>a.due<b.due?-1:1);
 const lateAckOf=(o,uid)=>((S.lateAck||{})[o.id]||{})[uid];
 const lateOk=(o,uid)=>{const a=lateAckOf(o,uid);return a&&a.day===addDays(0)&&a.due===o.due};
 const lateOpen=()=>{const u=curUser();return u?lateList().filter(o=>!lateOk(o,u.id)):[]};
@@ -3324,7 +3324,7 @@ function cfoSnap(){const sv=(f,d)=>{try{return f()}catch(e){return d}};const t0=
   const topCli=Object.entries(byCli).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([n,v])=>({dentista:n,faturado_3m:r2(v),participacao_pct:totCli?r2(v/totCli*100):0}));
   const bySvc={};del.forEach(o=>{const s=svcOf(o),k=s.name||'—';const x=bySvc[k]=bySvc[k]||{servico:k,categoria:s.cat||'',qtd:0,faturado_3m:0,custo_materiais:0};x.qtd+=o.billStage?0:q(o);x.faturado_3m+=total(o);x.custo_materiais+=o.remake?0:(o.matCost||0)});
   const topSvc=Object.values(bySvc).sort((a,b)=>b.faturado_3m-a.faturado_3m).slice(0,10).map(x=>({...x,faturado_3m:r2(x.faturado_3m),custo_materiais:r2(x.custo_materiais),preco_medio_elemento:x.qtd?r2(x.faturado_3m/x.qtd):null}));
-  const prodOpen=S.orders.filter(o=>!o.parent&&o.status==='producao'),late=prodOpen.filter(o=>o.due&&daysTo(o.due)<0);
+  const prodOpen=S.orders.filter(o=>!o.parent&&o.status==='producao'),late=prodOpen.filter(o=>isLate(o));
   const lead=del.filter(o=>o.created&&o.delivered).map(o=>(pd(o.delivered)-pd(o.created))/864e5),onTime=del.filter(o=>o.due&&o.delivered<=o.due).length;
   const open=S.receivables.filter(r=>!isPaid(r)),age=b=>r2(open.filter(r=>{const d=-daysTo(r.due);return d>=b[0]&&d<=b[1]}).reduce((a,r)=>a+r.amount,0));
   const billed3=S.receivables.filter(r=>r.due>=since&&r.due<=t0),lateRate=billed3.length?r2(billed3.filter(r=>!isPaid(r)).reduce((a,r)=>a+r.amount,0)/Math.max(1,billed3.reduce((a,r)=>a+r.amount,0))*100):0;
@@ -3938,6 +3938,86 @@ async function qcSrc(p){if(p.data)return p.data;if(!p.path||!qcCloud())return'';
 {const _ca=cfgAlerts;window.cfgAlerts=cfgAlerts=function(){return _ca()+(can('admin')?`<section class="panel"><h2>Qualidade</h2><label class="checks"><input type="checkbox" data-qc-set="1" ${qcOn()?'checked':''}> Exigir foto do trabalho ao concluir a conferência</label><p class="sub" style="margin:6px 0 0">A OS só sai da conferência com a foto registrada. Os retrabalhos pedem o motivo; veja em Relatórios → Retrabalhos por motivo.</p></section>`:'')}}
 document.addEventListener('change',e=>{if(e.target.dataset&&e.target.dataset.qcSet){S.settings.qcPhoto=e.target.checked;save();toast(e.target.checked?'Foto obrigatória na conferência ativada':'Foto na conferência deixou de ser obrigatória')}});
 
+/* ================= Prova com o dentista (prazo pausado) + gerar retrabalho a partir da OS ================= */
+MSG_EVENTS.prova=['Saiu para prova','Olá, {dentista}! O trabalho da OS {os} ({trabalho}), paciente {paciente}, saiu para {etapa}. Depois da prova, é só nos devolver com as observações para seguirmos.\n{laboratorio}'];
+if(!WA_EV_DEF.includes('prova'))WA_EV_DEF.push('prova');
+const PV_NAME={rol:'Prova do rolete (plano de cera)',mon:'Prova dos dentes',rem:'Prova da remontagem',fun:'Prova da estrutura',fre:'Prova da estrutura',imp:'Prova do modelo impresso',cad:'Aprovação do desenho',cer:'Prova da cerâmica',mod:'Prova do modelo',ter:'Prova da placa',aca:'Prova do trabalho',acr:'Prova do trabalho'};
+const pvName=st=>PV_NAME[st]||('Prova · '+(SN[st]||st));
+const pvDone=o=>svcOf(o).stages.slice(0,o.idx).filter(s=>!(o.skip||[]).includes(s)&&s!=='rec');
+const isLate=o=>o.status==='producao'&&!o.prova&&!!o.due&&daysTo(o.due)<0;
+const pvOn=()=>{const N=S.settings.notify;if(N&&N.on&&N.on.prova===undefined)N.on.prova=true};
+(()=>{const s=document.createElement('style');s.textContent='.pill.prova{background:var(--accent-soft);color:var(--accent)}.pv-box{border:1px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.pv-list{display:flex;flex-direction:column;gap:4px;margin-top:6px;font-size:13px}';document.head.appendChild(s)})();
+
+{const _di=dueInfo;window.dueInfo=dueInfo=function(o){if(o&&o.prova&&o.status==='producao'){const d=-daysTo(o.prova.out),late=o.prova.back&&daysTo(o.prova.back)<0;return{c:late?'soon':'prova',t:late?`Prova sem retorno · ${d}d`:`Em prova${d>0?` há ${d}d`:' · hoje'}`}}return _di(o)}}
+
+function pvOut(id){
+  const o=find('orders',id);if(!o||o.status!=='producao')return;pvOn();
+  const done=pvDone(o),def=done[done.length-1]||curStage(o),opts=[...new Set([...done,curStage(o)].filter(Boolean))];
+  openModal(mhead('Enviar para prova','OS '+o.num+' · '+esc(svcOf(o).name))+`<form id="pvOutForm" data-id="${o.id}" class="grid">
+  <p class="sub" style="margin:0">Enquanto o trabalho estiver com o dentista, o prazo fica pausado e a OS não aparece como atrasada. Na volta, você define o novo prazo.</p>
+  <div class="form-grid">${fld('pv-st','O que vai para prova',`<select id="pv-st">${opts.map(s=>`<option value="${s}" ${s===def?'selected':''}>${esc(pvName(s))}</option>`).join('')}</select>`)}
+  ${fld('pv-back','Volta prevista',`<input id="pv-back" type="date" value="${addDays(3)}">`)}</div>
+  ${fld('pv-note','Observação (opcional)',`<input id="pv-note" maxlength="200" placeholder="Ex.: conferir linha média e altura do sorriso">`)}
+  <label class="checks"><input type="checkbox" id="pv-msg" ${S.settings.notify&&S.settings.notify.on&&S.settings.notify.on.prova===false?'':'checked'}> Avisar o dentista que saiu para prova</label>
+  <div class="sheet-foot"><span></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-pv-cancel="${o.id}">Voltar</button><button class="btn primary" type="submit">Enviar para prova</button></div></div></form>`,true);
+}
+function pvIn(id){
+  const o=find('orders',id);if(!o||!o.prova)return;const P=o.prova,away=Math.max(0,-daysTo(P.out)),nd=addDays(Math.max(1,daysTo(P.due||addDays(0))+away)),nxt=curStage(o),n=(o.provas||[]).length+1;
+  openModal(mhead('Voltou da prova','OS '+o.num+' · '+esc(pvName(P.stage)))+`<form id="pvInForm" data-id="${o.id}" class="grid">
+  <p class="sub" style="margin:0">${n}ª prova · saiu em ${dmy(P.out)} · ${away} dia(s) com o dentista. O prazo ficou pausado nesse período.</p>
+  <div class="field"><span class="lbl">Resultado</span><div class="checks" style="flex-direction:column;gap:6px;padding-top:4px">
+   <label><input type="radio" name="pv-ok" value="1" checked> Aprovada · segue para ${esc(SN[nxt]||'a próxima etapa')}</label>
+   <label><input type="radio" name="pv-ok" value="0"> Precisa de ajuste</label></div></div>
+  <div class="form-grid">${fld('pv-due','Novo prazo de entrega',`<input id="pv-due" type="date" value="${nd}" required>`)}${fld('pv-inote','O que o dentista pediu',`<input id="pv-inote" maxlength="300" placeholder="Ex.: subir 1 mm o 11 e 21">`)}</div>
+  <p class="note" style="margin:0">Prazo sugerido: o prazo que faltava quando saiu, contado a partir de hoje.</p>
+  <div class="sheet-foot"><span></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-pv-cancel="${o.id}">Voltar</button><button class="btn primary" type="submit">Registrar volta</button></div></div></form>`,true);
+}
+function pvProvasHtml(o){const L=o.provas||[];if(!L.length&&!o.prova)return'';
+  return`<div id="pv-sec"><span class="lbl">Provas com o dentista</span><div class="pv-list">${L.map((p,i)=>`<div>${i+1}ª · <b style="font-weight:600">${esc(pvName(p.stage))}</b> · ${dm(p.out)} → ${dm(p.back)} (${p.days}d) · ${p.ok?'<span style="color:var(--ok)">aprovada</span>':'<span style="color:var(--soon)">ajuste</span>'}${p.note?` · <span class="mut">${esc(p.note)}</span>`:''}</div>`).join('')}${o.prova?`<div>${L.length+1}ª · <b style="font-weight:600">${esc(pvName(o.prova.stage))}</b> · saiu ${dm(o.prova.out)} · <span style="color:var(--accent)">com o dentista</span>${o.prova.note?` · <span class="mut">${esc(o.prova.note)}</span>`:''}</div>`:''}</div></div>`}
+
+function rmkFrom(id){
+  let o=find('orders',id);if(!o)return;if(o.parent)o=find('orders',o.parent)||o;
+  if(!can('os')&&myTech()){toast('Sem permissão para abrir OS');return}
+  if(newOrder()===false)return;
+  const svc=find('services',o.service);
+  Object.assign(draft,{client:o.client,service:svc&&svc.active!==false?o.service:draft.service,teeth:[...(o.teeth||[])],qty:q(o),shade:o.shade||draft.shade,patient:o.patient||'',remake:true,remakeOf:String(o.num),due:addDays(7),notes:'',extras:[]});
+  renderNewOrder();toast(`Retrabalho da OS ${o.num}: escolha o motivo`);
+  setTimeout(()=>{const r=document.getElementById('rm-remakeReason');if(r)r.focus()},50);
+}
+
+{const _oo=openOrder;window.openOrder=openOrder=function(id,...a){const r=_oo(id,...a);try{let o=find('orders',id);if(o&&o.parent)o=find('orders',o.parent)||o;if(!o)return r;
+  const bench=document.querySelector(`#sheet [data-act="bench"][data-id="${o.id}"]`),grp=bench&&bench.parentElement;
+  if(grp){if(o.status==='producao'&&!o.prova)grp.insertAdjacentHTML('beforeend',`<button class="btn" data-pv-out="${o.id}">Enviar para prova</button>`);
+    if(o.status==='entregue')grp.insertAdjacentHTML('beforeend',`<button class="btn" data-rmk-from="${o.id}">Gerar retrabalho</button>`)}
+  const tl=document.querySelector('#sheet .tl');const sec=pvProvasHtml(o);if(tl&&sec)tl.parentElement.insertAdjacentHTML('afterend',sec);
+  if(o.prova){const adv=document.querySelector(`#sheet [data-act="adv"][data-id="${o.id}"]`),box=adv&&adv.parentElement;
+    if(box)box.outerHTML=`<div class="pv-box"><span><b style="font-weight:600">Com o dentista · ${esc(pvName(o.prova.stage))}</b><br><span class="mut" style="font-size:12.5px">Saiu em ${dmy(o.prova.out)}${o.prova.back?` · volta prevista ${dmy(o.prova.back)}`:''} · prazo pausado</span></span><button class="btn primary" data-pv-in="${o.id}">Voltou da prova</button></div>`}
+  }catch(e){console.error(e)}return r}}
+
+{const _adv=advance;window.advance=advance=function(id,...a){const o=find('orders',id);if(o&&o.prova){toast(`A OS ${o.num} está com o dentista. Registre a volta da prova primeiro.`);setTimeout(()=>pvIn(id),0);return}return _adv(id,...a)}}
+
+document.addEventListener('click',e=>{const t=e.target.closest('[data-pv-out],[data-pv-in],[data-pv-cancel],[data-rmk-from]');if(!t)return;e.preventDefault();e.stopPropagation();
+  if(t.dataset.pvOut)pvOut(t.dataset.pvOut);else if(t.dataset.pvIn)pvIn(t.dataset.pvIn);else if(t.dataset.pvCancel)openOrder(t.dataset.pvCancel);else if(t.dataset.rmkFrom)rmkFrom(t.dataset.rmkFrom)},true);
+
+document.addEventListener('submit',e=>{const f=e.target;if(f.id!=='pvOutForm'&&f.id!=='pvInForm')return;e.preventDefault();e.stopPropagation();
+  const o=find('orders',f.dataset.id);if(!o)return;const v=k=>(document.getElementById(k)||{}).value||'',u=curUser()||{};
+  if(f.id==='pvOutForm'){
+    o.prova={out:addDays(0),stage:v('pv-st'),back:v('pv-back')||null,note:v('pv-note').trim(),due:o.due,by:u.name||''};
+    let msg='';if(document.getElementById('pv-msg').checked){pvOn();const c=cliOf(o.client);const ok=queueMsg('prova','prova:'+o.id+':'+((o.provas||[]).length+1),o.client,fillTpl('prova',{...orderVars(o),etapa:pvName(o.prova.stage).toLowerCase()}),{order:o.id});msg=ok?' · aviso ao dentista na fila':''}
+    save();openOrder(o.id);render();toast(`OS ${o.num} saiu para prova · prazo pausado${msg}`);
+  }else{
+    const P=o.prova;if(!P)return;const ok=(f.querySelector('input[name="pv-ok"]:checked')||{}).value!=='0',nd=v('pv-due')||o.due,oldDue=o.due;
+    o.provas=[...(o.provas||[]),{out:P.out,back:addDays(0),stage:P.stage,ok,note:v('pv-inote').trim()||P.note||'',days:Math.max(0,-daysTo(P.out)),by:u.name||''}];
+    delete o.prova;o.due=nd;kidsOf(o).forEach(k=>k.due=o.due);if(o.due!==oldDue)msgOrder('prazo',o);
+    save();openOrder(o.id);render();toast(`Prova registrada${ok?' · aprovada':' · ajuste'} · novo prazo ${dmy(o.due)}`);
+  }},true);
+
+/* relatório: provas por dentista e serviço */
+{const i=REPORTS.findIndex(r=>r.id==='retrabmot');REPORTS.splice(i<0?REPORTS.length:i+1,0,{id:'provas',g:'Produção',n:'Provas com o dentista',d:'Quantas provas cada trabalho teve, quanto tempo ficou no consultório e quantas pediram ajuste.',f:['cli','svc'],
+  run(F){const rows=[];S.orders.filter(o=>!o.parent&&o.status!=='cancelado'&&mine(o)&&(!F.cli||o.client===F.cli)&&(!F.svc||o.service===F.svc)).forEach(o=>{(o.provas||[]).forEach((p,i)=>{if(inP(p.back,F))rows.push([p.back,o.num,cliOf(o.client).name,svcOf(o).name,o.patient||'',`${i+1}ª · ${pvName(p.stage)}`,p.out,p.days,p.ok?'Aprovada':'Ajuste',p.note||''])});if(o.prova&&inP(addDays(0),F))rows.push(['',o.num,cliOf(o.client).name,svcOf(o).name,o.patient||'',`${(o.provas||[]).length+1}ª · ${pvName(o.prova.stage)}`,o.prova.out,Math.max(0,-daysTo(o.prova.out)),'Com o dentista',o.prova.note||''])});
+    rows.sort((a,b)=>String(b[6]).localeCompare(String(a[6])));const fin=rows.filter(r=>r[8]!=='Com o dentista'),aj=fin.filter(r=>r[8]==='Ajuste').length,dias=fin.reduce((a,r)=>a+r[7],0);
+    return{cols:[['Voltou em','d'],['OS','t'],['Dentista','t'],['Serviço','t'],['Paciente','t'],['Prova','t'],['Saiu em','d'],['Dias com o dentista','n'],['Resultado','t'],['Observação','t']],rows,
+      kpi:[['Provas',String(rows.length)],['Com ajuste',fin.length?Math.round(aj/fin.length*100)+'%':'—'],['Média de dias no consultório',fin.length?(dias/fin.length).toFixed(1).replace('.',','):'—'],['Agora com o dentista',String(rows.filter(r=>r[8]==='Com o dentista').length)]]}}});}
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}
