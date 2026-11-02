@@ -267,7 +267,7 @@ footer .wrap{display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-con
 
 <footer><div class="wrap">
   <a class="brand" href="#" style="font-size:15px"><svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="cg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7FF3EA"/><stop offset=".55" stop-color="#2BBFB4"/><stop offset="1" stop-color="#D9B872"/></linearGradient></defs><path d="M16 2 28 9v14l-12 7L4 23V9z" fill="none" stroke="url(#cg1)" stroke-width="2"/><path d="M16 2v28M4 9l24 14M28 9 4 23" stroke="url(#cg1)" stroke-width="1" opacity=".55"/><circle cx="16" cy="16" r="3.2" fill="url(#cg1)"/></svg>CERIONE</a>
-  <nav aria-label="Rodapé"><a href="#planos">Planos</a><a href="#seguranca">Segurança e LGPD</a><a href="marca.html">Manual da marca</a><a href="app/">Entrar</a></nav>
+  <nav aria-label="Rodapé"><a href="#planos">Planos</a><a href="#seguranca">Segurança e LGPD</a><a href="termos.html">Termos de uso</a><a href="privacidade.html">Privacidade</a><a href="marca.html">Manual da marca</a><a href="app/">Entrar</a></nav>
   <span>© 2026 CERIONE · Gestão para laboratórios de prótese dentária</span>
 </div></footer>
 
@@ -284,6 +284,11 @@ function paint(d){const P=(d.plans||[]).slice(0,3),F=d.features||[],list=F.filte
     <ul><li><i>✓</i><span>Produção, OS com QR e ficha de bancada</span></li><li><i>✓</i><span>Dentistas e mensagens</span></li>${list.map(f=>`<li class="${inc.has(f.id)?'':'no'}"><i>${inc.has(f.id)?'✓':'—'}</i><span>${short(f.name)}</span></li>`).join('')}</ul>
     <a class="btn ${p.id===dest?'btn-z':'btn-l'}" href="app/#criar-conta">Testar grátis</a></article>`}).join('');
   document.querySelector('#adds tbody').innerHTML=list.map(f=>`<tr><td>${short(f.name)}<span class="k">${f.kind==='adicional'?'Adicional':'Módulo'}</span></td><td>+ ${brl(f.price)}/mês</td></tr>`).join('')}
+/* origem da visita (anúncio, indicação), guardada para o cadastro do teste grátis */
+(function(){try{const q=new URLSearchParams(location.search),a=JSON.parse(localStorage.getItem('cer-attrib')||'{}');let ch=false;
+  ['utm_source','utm_medium','utm_campaign','ref'].forEach(k=>{const v=q.get(k);if(v){a[k]=v.slice(0,80);ch=true}});
+  if(!a.landing){a.landing=(location.pathname+location.search).slice(0,120);a.referrer=(document.referrer||'').slice(0,120);a.at=new Date().toISOString();ch=true}
+  if(ch)localStorage.setItem('cer-attrib',JSON.stringify(a))}catch(e){}})();
 paint(FALLBACK);
 fetch(SB.url+'/rest/v1/rpc/public_pricing',{method:'POST',headers:{apikey:SB.key,'Content-Type':'application/json'},body:'{}'}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.plans&&d.plans.length)paint(d)}).catch(()=>{});
 /* a ficha do topo: o QR é lido e a etapa atual é concluída, uma vez */

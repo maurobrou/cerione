@@ -3799,6 +3799,72 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   else if(d.popCopy){const txt=popDentText(d.popCopy,d.popCli?cliOf(d.popCli):null);try{navigator.clipboard.writeText(txt).then(()=>toast('Lista copiada. Cole no WhatsApp do dentista.'),()=>copyText(txt,''))}catch(er){copyText(txt,'')}}
   else if(d.popReset){if(S.settings.pops)delete S.settings.pops[d.popReset];save();render();toast('Texto padrão restaurado')}});
 (function(){const c=document.createElement('style');c.textContent='.pop-dent{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}.pop-dent li{border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-width:0}.pop-il{background:var(--bg2,#F6F9FA);border-bottom:1px solid var(--line);aspect-ratio:16/9;display:grid;place-items:center;color:var(--ink);--il-a:var(--accent,#0E8F87);--il-b:var(--accent-soft,#D9F3F0)}.pop-il svg{width:74%;height:auto;max-height:100%}.pop-dent li>div:last-child{padding:12px 14px}.pop-dent b{display:flex;gap:8px;align-items:flex-start;font-size:14.5px;line-height:1.35}.pop-n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:12px;display:inline-grid;place-items:center;font-variant-numeric:tabular-nums}.pop-dent p{margin:6px 0 0 30px;font-size:13.5px;color:var(--muted);line-height:1.5}';document.head.appendChild(c)})();
+/* ================= Importar planilha: dentistas e serviços/preços (Excel, CSV ou colar do Excel) ================= */
+const IMP={
+  clients:{n:'Dentistas e clínicas',key:'name',cols:[['name','Nome do dentista',1,['nome','dentista','cliente','nome do dentista','razao social','razão social']],['clinic','Clínica',0,['clinica','clínica','consultorio','consultório','empresa','nome fantasia']],
+    ['doc','CPF ou CNPJ',0,['cpf','cnpj','cpf/cnpj','documento','cpf ou cnpj']],['cro','CRO',0,['cro']],['phone','Telefone / WhatsApp',0,['telefone','celular','whatsapp','fone','tel']],['email','E-mail',0,['email','e-mail']],
+    ['street','Endereço',0,['endereco','endereço','rua','logradouro']],['number','Número',0,['numero','número','nº','n']],['district','Bairro',0,['bairro']],['city','Cidade',0,['cidade','municipio','município']],['uf','UF',0,['uf','estado']],
+    ['discount','Desconto %',0,['desconto','desconto %','desc']],['term','Condição (mensal ou entrega)',0,['condicao','condição','pagamento','forma de cobranca','forma de cobrança']],['dueDays','Prazo (dias)',0,['prazo','dias','vencimento','prazo (dias)']]]},
+  services:{n:'Serviços e tabela de preços',key:'name',cols:[['name','Serviço',1,['servico','serviço','nome','descricao','descrição','trabalho','produto']],['cat','Categoria',0,['categoria','grupo','tipo']],
+    ['price','Preço (R$)',1,['preco','preço','valor','preco (r$)','preço (r$)','valor unitario','valor unitário']],['unit','Unidade',0,['unidade','un','und']]]}};
+const impNorm=s=>String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const impNum=v=>{if(typeof v==='number')return v;let s=String(v??'').replace(/[R$\s%]/g,'');if(!s)return null;if(/,\d{1,2}$/.test(s))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'');const n=parseFloat(s);return isFinite(n)?n:null};
+function impParse(text){const first=text.split(/\r?\n/).find(l=>l.trim())||'';const sep=first.includes('\t')?'\t':(first.split(';').length>first.split(',').length?';':',');
+  const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++}else q=false}else cell+=c}
+    else if(c==='"')q=true;else if(c===sep){row.push(cell);cell=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cell);rows.push(row);row=[];cell=''}else cell+=c}
+  if(cell!==''||row.length){row.push(cell);rows.push(row)}return rows.filter(r=>r.some(x=>String(x).trim()))}
+let IMPS=null;
+async function impXlsx(file){if(!window.XLSX){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=res;s.onerror=()=>rej(new Error('Não foi possível abrir arquivos do Excel agora. Salve como CSV e tente de novo.'));document.head.appendChild(s)})}
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}).filter(r=>r.some(x=>String(x).trim()))}
+function impTemplate(kind){const D=IMP[kind],head=D.cols.map(c=>c[1]),ex=kind==='clients'?['Dra. Ana Lima','Clínica Sorriso','123.456.789-09','PR-12345','(43) 99999-0000','ana@exemplo.com','Rua Sergipe','100','Centro','Londrina','PR','5','mensal','10']:['Coroa em zircônia','Coroas','420,00','unidade'];
+  const csv='﻿'+[head,ex].map(r=>r.map(x=>/[;"\n]/.test(x)?'"'+String(x).replace(/"/g,'""')+'"':x).join(';')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`modelo-${kind==='clients'?'dentistas':'servicos'}-cerione.csv`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+function impOpen(kind){IMPS={kind:kind||'clients',rows:null,map:{},hdr:true,name:''};impDraw()}
+function impAuto(){const D=IMP[IMPS.kind],h=(IMPS.rows[0]||[]).map(impNorm);IMPS.map={};
+  D.cols.forEach(([k,n,,syn])=>{const i=h.findIndex(x=>x===impNorm(n)||syn.includes(x));if(i>=0)IMPS.map[k]=i});IMPS.hdr=Object.keys(IMPS.map).length>0;
+  if(!IMPS.hdr)D.cols.forEach(([k],i)=>{if(i<(IMPS.rows[0]||[]).length)IMPS.map[k]=i})}
+function impRows(){const D=IMP[IMPS.kind],body=IMPS.hdr?IMPS.rows.slice(1):IMPS.rows,list=IMPS.kind==='clients'?S.clients:S.services;
+  return body.map((r,ix)=>{const o={};D.cols.forEach(([k])=>{const i=IMPS.map[k];if(i!=null&&i!=='')o[k]=String(r[i]??'').trim()});
+    let err='';if(!o.name)err='sem nome';
+    if(IMPS.kind==='services'){const p=impNum(o.price);if(p==null&&!err)err='preço inválido';o.price=p}
+    else{if(o.discount!=null&&o.discount!=='')o.discount=impNum(o.discount)||0;if(o.dueDays!=null&&o.dueDays!=='')o.dueDays=Math.round(impNum(o.dueDays)||0);if(o.term)o.term=/entreg/i.test(o.term)?'entrega':'mensal';if(o.uf)o.uf=o.uf.toUpperCase().slice(0,2)}
+    const dg=x=>String(x||'').replace(/\D/g,'');const ex=err?null:list.find(x=>!x.archived&&(impNorm(x.name)===impNorm(o.name)||(IMPS.kind==='clients'&&dg(o.doc).length>=11&&dg(x.doc)===dg(o.doc))));
+    return{o,err,ex,line:ix+(IMPS.hdr?2:1)}})}
+function impDraw(){const D=IMP[IMPS.kind];
+  let body=`<div class="seg" style="margin-bottom:4px">${Object.entries(IMP).map(([k,v])=>`<button data-imp-kind="${k}" aria-pressed="${k===IMPS.kind}">${v.n}</button>`).join('')}</div>`;
+  if(!IMPS.rows){body+=`<p class="sub" style="margin:0">Use a planilha que você já tem (Excel ou CSV) ou baixe o modelo. Também dá para copiar as células no Excel e colar aqui.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn primary" style="cursor:pointer">Escolher arquivo<input type="file" id="imp-file" accept=".csv,.txt,.xlsx,.xls,text/csv" hidden></label><button class="btn" data-imp-tpl="1" type="button">Baixar modelo</button></div>
+    <div class="field"><label for="imp-paste">Ou cole aqui as linhas copiadas do Excel</label><textarea id="imp-paste" rows="5" placeholder="Nome do dentista	Clínica	Telefone…"></textarea><button class="btn" type="button" id="imp-paste-go" style="margin-top:6px;align-self:flex-start">Usar o texto colado</button></div>
+    <p class="mut" style="font-size:12.5px;margin:0">Colunas que o sistema reconhece: ${D.cols.map(c=>c[1]+(c[2]?' (obrigatória)':'')).join(', ')}.</p><p class="err" id="imp-err"></p>`}
+  else{const R=impRows(),ok=R.filter(r=>!r.err),nw=ok.filter(r=>!r.ex).length,up=ok.length-nw,bad=R.length-ok.length,cols=(IMPS.rows[0]||[]).map((x,i)=>IMPS.hdr?String(x):'Coluna '+(i+1));
+    body+=`<p class="sub" style="margin:0">${esc(IMPS.name||'Planilha')} · ${R.length} linha(s). Confira em qual coluna está cada informação:</p>
+    <label class="checks"><input type="checkbox" id="imp-hdr" ${IMPS.hdr?'checked':''}> A primeira linha é o cabeçalho</label>
+    <div class="form-grid">${D.cols.map(([k,n,req])=>fld('imp-c-'+k,n+(req?' *':''),`<select data-imp-col="${k}"><option value="">— não importar —</option>${cols.map((c,i)=>`<option value="${i}" ${IMPS.map[k]===i?'selected':''}>${esc(c||'Coluna '+(i+1))}</option>`).join('')}</select>`)).join('')}</div>
+    <div class="costbox"><div><span class="k">Novos</span><span class="v">${nw}</span></div><div><span class="k">Atualizados</span><span class="v">${up}</span></div><div><span class="k">Com problema</span><span class="v">${bad}</span></div></div>
+    ${tbl(['Linha','Nome',IMPS.kind==='clients'?'Clínica':'#Preço','Situação'],R.slice(0,10).map(r=>`<tr><td class="mut">${r.line}</td><td>${esc(r.o.name||'—')}</td><td${IMPS.kind==='clients'?'':' class="n"'}>${IMPS.kind==='clients'?esc(r.o.clinic||''):r.o.price!=null?fmt(r.o.price):'—'}</td><td>${r.err?`<span class="pill late">${r.err}</span>`:r.ex?'<span class="pill soon">atualiza</span>':'<span class="pill ok">novo</span>'}</td></tr>`))}
+    ${R.length>10?`<p class="mut" style="font-size:12.5px;margin:0">Mostrando 10 de ${R.length} linhas.</p>`:''}
+    <p class="mut" style="font-size:12.5px;margin:0">Quem já existe com o mesmo nome${IMPS.kind==='clients'?' ou CPF/CNPJ':''} é atualizado só nos campos preenchidos; o resto fica como está. Antes de gravar, o sistema guarda uma cópia para desfazer em Configurações → Cópias de segurança.</p>`}
+  openModal(mhead('Importar planilha',D.n)+`<div class="grid" id="imp-box">${body}<div class="sheet-foot"><span></span><div style="display:flex;gap:8px">${IMPS.rows?'<button class="btn" type="button" data-imp-back="1">Trocar arquivo</button>':''}<button type="button" class="btn" data-act="close">Cancelar</button>${IMPS.rows?`<button class="btn primary" type="button" data-imp-go="1">Importar</button>`:''}</div></div></div>`)}
+async function impLoad(file){try{let rows;if(/\.xlsx?$/i.test(file.name))rows=await impXlsx(file);else{const buf=await file.arrayBuffer();let t=new TextDecoder('utf-8').decode(buf);if(t.includes('�'))t=new TextDecoder('windows-1252').decode(buf);rows=impParse(t.replace(/^﻿/,''))}
+  if(!rows.length)throw new Error('A planilha está vazia.');IMPS.rows=rows.map(r=>r.map(x=>x instanceof Date?x.toISOString().slice(0,10):x));IMPS.name=file.name;impAuto();impDraw()}
+  catch(e){const el=document.getElementById('imp-err');if(el)el.textContent=e.message||'Não foi possível ler o arquivo.'}}
+function impApply(){const R=impRows().filter(r=>!r.err);if(!R.length){toast('Nenhuma linha válida para importar');return}
+  snapshot('Antes de importar planilha ('+IMP[IMPS.kind].n.toLowerCase()+')');let n=0,u=0;
+  R.forEach(({o,ex})=>{const clean=Object.fromEntries(Object.entries(o).filter(([,v])=>v!==''&&v!=null));
+    if(IMPS.kind==='clients'){if(ex){Object.assign(ex,clean);u++}else{S.clients.push({id:uid('c'),name:'',clinic:'',city:'',phone:'',email:'',doc:'',discount:0,term:'mensal',dueDays:10,...clean});n++}}
+    else{if(ex){Object.assign(ex,clean);ex.consult=+ex.price===0;u++}else{S.services.push({id:uid('s'),name:clean.name,cat:clean.cat||'Importados',unit:clean.unit||'unidade',price:+clean.price||0,consult:!(+clean.price),weight:1,stages:['rec','mod','cad','fre','cer','aca','con','exp'],rates:{},bom:[],lab:[],eq:[]});n++}}});
+  try{auditPush({kind:'importacao',txt:`Importou planilha de ${IMP[IMPS.kind].n.toLowerCase()}: ${n} novo(s), ${u} atualizado(s)`})}catch(e){}
+  save();closeModal();render();toast(`${n} novo(s) e ${u} atualizado(s) importados`)}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-imp-open],[data-imp-kind],[data-imp-tpl],[data-imp-back],[data-imp-go],#imp-paste-go');if(!t)return;
+  if(t.dataset.impOpen!==undefined){e.stopPropagation();const k=t.dataset.impOpen;setTimeout(()=>impOpen(k),0)}else if(t.dataset.impKind){IMPS={kind:t.dataset.impKind,rows:null,map:{},hdr:true,name:''};impDraw()}
+  else if(t.dataset.impTpl)impTemplate(IMPS.kind);else if(t.dataset.impBack){IMPS.rows=null;impDraw()}else if(t.dataset.impGo)impApply();
+  else if(t.id==='imp-paste-go'){const v=(document.getElementById('imp-paste')||{}).value||'';const rows=impParse(v);if(!rows.length){document.getElementById('imp-err').textContent='Cole as linhas da planilha antes.';return}IMPS.rows=rows;IMPS.name='Texto colado';impAuto();impDraw()}});
+document.addEventListener('change',e=>{const t=e.target;if(t.id==='imp-file'&&t.files[0])impLoad(t.files[0]);else if(t.dataset&&t.dataset.impCol){IMPS.map[t.dataset.impCol]=t.value===''?undefined:+t.value;impDraw()}else if(t.id==='imp-hdr'){IMPS.hdr=t.checked;impDraw()}});
+{const _vc=V.clientes,_vs=V.servicos;
+ V.clientes=(...a)=>{const s=_vc(...a);return can('cli')||can('admin')?s.replace('<button class="btn primary" data-act="ent-form" data-k="clients">+ Novo cliente</button>','<button class="btn" data-imp-open="clients">Importar planilha</button><button class="btn primary" data-act="ent-form" data-k="clients">+ Novo cliente</button>'):s};
+ V.servicos=(...a)=>{const s=_vs(...a);return !(can('preco')||can('admin'))?s:s.replace('<button class="btn primary" data-act="svc-open">+ Novo serviço</button>','<button class="btn" data-imp-open="services">Importar planilha</button><button class="btn primary" data-act="svc-open">+ Novo serviço</button>')};}
+
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}

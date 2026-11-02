@@ -63,6 +63,8 @@ const MASK={cnpj:v=>dig(v).slice(0,14).replace(/^(\d{2})(\d)/,'$1.$2').replace(/
   cpf:v=>dig(v).slice(0,11).replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2'),
   tel:v=>{const d=dig(v).slice(0,11);return d.length<=10?d.replace(/^(\d{2})(\d)/,'($1) $2').replace(/(\d{4})(\d)/,'$1-$2'):d.replace(/^(\d{2})(\d)/,'($1) $2').replace(/(\d{5})(\d)/,'$1-$2')},
   cep:v=>dig(v).slice(0,8).replace(/(\d{5})(\d)/,'$1-$2')};
+const SRC=[['instagram','Instagram'],['indicacao','Indicação de outro laboratório'],['google','Pesquisa no Google'],['whatsapp','WhatsApp'],['parceiro','Fornecedor ou parceiro'],['evento','Curso, congresso ou feira'],['gegran','Gegran Consultoria'],['outro','Outro']];
+function attrib(){let a={};try{a=JSON.parse(localStorage.getItem('cer-attrib')||'{}')||{}}catch(e){}const q=new URLSearchParams(location.search);['utm_source','utm_medium','utm_campaign','ref'].forEach(k=>{const v=q.get(k);if(v)a[k]=v.slice(0,80)});return a}
 const UFS='AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
 async function conta(action,body){const{data,error}=await C.sb.functions.invoke('conta',{body:{action,...(body||{})}});
   if(error){let j={};try{j=await error.context.json()}catch(e){}const er=new Error(j.error||error.message||'erro');er.fields=j.fields;er.status=j.status;throw er}return data||{}}
@@ -101,7 +103,7 @@ function forgotScreen(email='',inv=false){
   $('au-fg').addEventListener('submit',async e=>{e.preventDefault();const em=$('au-fe').value.trim(),b=$('au-fg').querySelector('button');b.disabled=true;msg('Enviando…');
     try{await conta('forgot',{email:em});msg(inv?`Se ${em} tiver um convite, a senha provisória chega em instantes. Confira também a caixa de spam.`:`Se ${em} tiver conta no CERIONE, o link chega em instantes. Confira também a caixa de spam. O link vale por 1 hora.`,'ok')}
     catch(err){msg(contaErr(err),'err')}finally{b.disabled=false}})}
-function signupScreen(){let step=1,rf=null;const V={};
+function signupScreen(){let step=1,rf=null;const V={},AT=attrib();
   screen(`<h2 style="margin:0">Criar conta · 14 dias grátis</h2><p class="sub" style="margin:0">Com todos os recursos e sem cartão. A senha provisória chega no e-mail do responsável.</p>
   <div class="steps"><span class="on">1. Empresa</span><span>2. Responsável</span></div><div id="au-msg" class="msg" hidden></div>
   <form id="au-up" novalidate><fieldset id="st1"><legend>Dados da empresa</legend>
@@ -117,7 +119,9 @@ function signupScreen(){let step=1,rf=null;const V={};
    <div class="g2">${F('su-cpf','CPF','inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" required')}${F('su-tel','Celular / WhatsApp','type="tel" inputmode="tel" autocomplete="tel" placeholder="(43) 99999-9999" required')}</div>
    ${F('su-email','E-mail','type="email" autocomplete="email" required','A senha provisória e os avisos da conta vão para este e-mail.')}
    ${F('su-email2','Confirme o e-mail','type="email" autocomplete="off" required')}
-   <label class="ck"><input type="checkbox" id="su-terms"> <span>Li e aceito os termos de uso e autorizo o tratamento destes dados para criar e administrar a conta, conforme a LGPD.</span></label>
+   <div class="g2"><div class="field" data-f="su-src"><label for="su-src">Como conheceu o CERIONE?</label><select id="su-src"><option value="">Escolha</option>${SRC.map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></div>${F('su-src-o','Qual? (opcional)','autocomplete="off" maxlength="80"')}</div>
+   <div id="su-refbox" class="rf" hidden></div>
+   <label class="ck"><input type="checkbox" id="su-terms"> <span>Li e aceito os <a href="../termos.html" target="_blank" rel="noopener" style="color:#3DD9CE">termos de uso</a> e a <a href="../privacidade.html" target="_blank" rel="noopener" style="color:#3DD9CE">política de privacidade</a>, e autorizo o tratamento destes dados para criar e administrar a conta, conforme a LGPD.</span></label>
    <div class="row"><button class="btn" type="button" id="su-prev">Voltar</button><button class="btn primary" type="submit">Criar conta</button></div></fieldset></form>
   ${lk('au-back','Já tenho conta · Entrar')}`);
   const box=$('auth').querySelector('.box');box.classList.add('mid');
@@ -142,7 +146,8 @@ function signupScreen(){let step=1,rf=null;const V={};
     if(b.length){msg({'su-name':'Digite o nome completo do responsável.','su-cpf':'CPF inválido. Confira os números.','su-tel':'Celular incompleto.','su-email':'E-mail inválido.','su-email2':'Os dois e-mails não são iguais.'}[b[0]],'err');return}
     if(!$('su-terms').checked){msg('Para criar a conta, aceite os termos de uso.','err');return}
     const btn=$('au-up').querySelector('button[type=submit]');btn.disabled=true;msg('Criando sua conta…');
-    try{await conta('signup',{terms:true,company:{cnpj:dig($('su-cnpj').value),legal_name:$('su-legal').value,trade_name:$('su-trade').value,cep:$('su-cep').value,street:$('su-street').value,number:$('su-num').value,district:$('su-dist').value,city:$('su-city').value,uf:$('su-uf').value},
+    if(!$('su-src').value){bad(['su-src']);msg('Conte como conheceu o CERIONE.','err');btn.disabled=false;return}
+    try{await conta('signup',{terms:true,attrib:{...AT,source:$('su-src').value,other:$('su-src-o').value},company:{cnpj:dig($('su-cnpj').value),legal_name:$('su-legal').value,trade_name:$('su-trade').value,cep:$('su-cep').value,street:$('su-street').value,number:$('su-num').value,district:$('su-dist').value,city:$('su-city').value,uf:$('su-uf').value},
       owner:{name:$('su-name').value,cpf:dig($('su-cpf').value),phone:dig($('su-tel').value),email:em}});
       if(/criar-conta/.test(location.hash))history.replaceState(null,'',location.pathname);
       screen(`<h2 style="margin:0">Conta criada</h2><div class="msg ok">Enviamos a senha provisória para <b>${h(em)}</b>.</div>
@@ -152,6 +157,7 @@ function signupScreen(){let step=1,rf=null;const V={};
     catch(err){btn.disabled=false;const map={cnpj:'su-cnpj',legal_name:'su-legal',trade_name:'su-trade',city:'su-city',uf:'su-uf',owner_name:'su-name',cpf:'su-cpf',phone:'su-tel',email:'su-email'};
       if(err.fields){const ids=err.fields.map(f=>map[f]).filter(Boolean);if(ids.some(i=>['su-cnpj','su-legal','su-trade','su-city','su-uf'].includes(i)))go(1);bad(ids)}
       if(/cnpj/.test(err.message)){go(1);bad(['su-cnpj'])}if(err.message==='email_exists')bad(['su-email']);msg(contaErr(err),'err')}});
+  if(AT.ref){$('su-src').value='indicacao';const rb=$('su-refbox');rb.hidden=false;rb.textContent='Indicação: código '+String(AT.ref).toUpperCase()+'. Quem indicou e você ganham 1 mês grátis quando a assinatura começar.'}
   setTimeout(()=>$('su-cnpj').focus(),50)}
 function newPassScreen(forced){const em=(C.user&&C.user.email)||'';
   screen(`<h2 style="margin:0">${forced?'Crie sua senha definitiva':'Criar nova senha'}</h2><p class="sub" style="margin:0">${forced?'Você entrou com a senha provisória. Escolha agora a senha que vai usar daqui para frente.':'Escolha uma nova senha para '+h(em)+'.'}</p><div id="au-msg" class="msg" hidden></div>
@@ -257,7 +263,7 @@ window.CERIONE_COB=cob;
 const cobErr=e=>({asaas_not_configured:'A cobrança automática ainda não foi ativada pelo CERIONE. Fale com o suporte.',asaas_error:'O Asaas recusou a operação: '+(e.detail||'erro'),
   too_many_users:`Este plano permite até ${e.max} usuários e o laboratório tem ${e.members}. Escolha um plano maior ou remova acessos.`,missing_cnpj:'Cadastre o CNPJ do laboratório antes de assinar (fale com o suporte).',
   invalid_plan:'Plano inválido.',forbidden:'Só o dono do laboratório pode assinar.',lab_unavailable:'Este laboratório está cancelado.',no_subscription:'Este laboratório ainda não tem assinatura.'}[e.message]||errTxt(e));
-async function loadBill(){C.bill=null;if(!C.lab||!canBill())return;try{const{data}=await C.sb.rpc('my_billing',{p_lab:C.lab.id});C.bill=data||null}catch(e){}}
+async function loadBill(){C.bill=null;C.ref=null;if(!C.lab||!canBill())return;try{const{data}=await C.sb.rpc('my_billing',{p_lab:C.lab.id});C.bill=data||null}catch(e){}if(C.role==='dono'){try{const{data}=await C.sb.rpc('my_referral',{p_lab:C.lab.id});C.ref=data||null}catch(e){}}}
 async function reloadLabState(){try{const{data:st}=await C.sb.rpc('my_lab_status',{p_lab:C.lab.id});const s=(Array.isArray(st)?st[0]:st);if(s)C.st={...C.st,...s}}catch(e){}
   try{const{data:fe}=await C.sb.rpc('my_lab_features',{p_lab:C.lab.id});if(fe){window.CERIONE_FEATURES=Array.isArray(fe.modules)?fe.modules:null;window.CERIONE_PLAN=fe}}catch(e){}await loadBill()}
 const trialLeft=B=>B&&B.status==='trial'&&B.trial_end?Math.round((Date.parse(B.trial_end)-Date.parse(new Date(Date.now()-3*36e5).toISOString().slice(0,10)))/864e5):null;
@@ -280,7 +286,11 @@ function billPanel(){const B=C.bill;if(!B)return'';const tl=trialLeft(B),dono=C.
   <div class="costbox" style="margin:8px 0 12px"><div><span class="k">Plano</span><span class="v">${h(B.plan_name||'—')}</span></div><div><span class="k">Situação</span><span class="v">${h(stTxt)}</span></div>
    <div><span class="k">Valor</span><span class="v">${B.subscribed||B.status!=='trial'?BRL(B.charge)+(B.cycle==='YEARLY'?' por ano':' por mês'):'—'}</span></div><div><span class="k">Usuários</span><span class="v">${B.members}${B.max_users?' de '+B.max_users:''}</span></div></div>
   ${B.subscribed?tbl(['Vencimento','#Valor','Situação',''],rows,'Nenhuma fatura ainda.'):`<p class="sub" style="margin:0">${B.status==='trial'?'Durante o teste tudo fica liberado. Ao assinar, a primeira fatura só vence no fim do teste.':'Este laboratório ainda não tem assinatura automática.'}</p>`}
-  <p class="mut" style="font-size:12px;margin:10px 0 0">Pagamento por Pix, boleto ou cartão, pelo Asaas. Pix e cartão confirmam na hora; boleto em até 3 dias úteis. Fatura vencida há mais de ${B.grace_days} dias deixa o sistema só para consulta até o pagamento.</p></section>`}
+  <p class="mut" style="font-size:12px;margin:10px 0 0">Pagamento por Pix, boleto ou cartão, pelo Asaas. Pix e cartão confirmam na hora; boleto em até 3 dias úteis. Fatura vencida há mais de ${B.grace_days} dias deixa o sistema só para consulta até o pagamento.</p></section>${refPanel()}`}
+function refPanel(){const R=C.ref;if(!R||!R.code)return'';const link=location.origin+'/?ref='+encodeURIComponent(R.code);
+  return`<section class="panel"><div class="sec-h"><h2 style="margin:0">Indique e ganhe</h2><button class="btn sm primary" data-cl="ref-copy" data-link="${h(link)}">Copiar link</button></div>
+  <p class="sub" style="margin:4px 0 10px">Indique o CERIONE para outro laboratório. Quando ele assinar, vocês dois ganham 1 mês grátis.</p>
+  <div class="costbox"><div><span class="k">Seu link</span><span class="v" style="font-size:12.5px;word-break:break-all">${h(link)}</span></div><div><span class="k">Indicados</span><span class="v">${R.referred}</span></div><div><span class="k">Já assinaram</span><span class="v">${R.paying}</span></div></div></section>`}
 async function subModal(){let pr=null;try{const{data}=await C.sb.rpc('public_pricing');pr=data}catch(e){}if(!pr||!pr.plans){toast('Não foi possível carregar os planos');return}
   await loadBill();const B=C.bill||{},plans=pr.plans.filter(p=>+p.price>0),feats=(pr.features||[]).filter(f=>f.kind!=='base');
   let sel=(plans.find(p=>p.id===B.plan)||plans[1]||plans[0]).id,cyc=B.cycle||'MONTHLY',pay='UNDEFINED';const mine=new Set(B.modules||[]),add=new Set();
@@ -314,7 +324,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-cl],
   const a=b.dataset.cl||'out';e.stopPropagation();
   if(a==='out'){await push(true);await C.sb.auth.signOut();localStorage.removeItem(LAST);try{sessionStorage.removeItem('cl-labmode')}catch(e){}location.reload()}
   else if(a==='labs'){await push(true);localStorage.removeItem(LAST);try{sessionStorage.removeItem(LABMODE)}catch(e){}location.reload()}
-  else if(a==='hist')histModal();else if(a==='sub')subModal();else if(a==='bill-ref'){b.disabled=true;try{await cob('refresh');await reloadLabState();render();toast('Faturas atualizadas')}catch(err){toast(cobErr(err))}b.disabled=false}else if(a==='inv-new')invite();
+  else if(a==='hist')histModal();else if(a==='sub')subModal();else if(a==='ref-copy'){copyText(b.dataset.link,'Link de indicação copiado')}else if(a==='bill-ref'){b.disabled=true;try{await cob('refresh');await reloadLabState();render();toast('Faturas atualizadas')}catch(err){toast(cobErr(err))}b.disabled=false}else if(a==='inv-new')invite();
   else if(a==='restore'){const{error}=await C.sb.rpc('restore_history',{p_lab:C.lab.id,p_id:+b.dataset.h});if(error){toast(errTxt(error));return}const docs=await loadDocs();S=merge(docs);migrate();applyUsers();Object.keys(AREAS).forEach(x=>C.sent[x]=J(split()[x]));closeModal();render();toast('Área restaurada da cópia escolhida')}
   else if(a==='rm'){const{error}=await C.sb.rpc('remove_member',{p_lab:C.lab.id,p_user:b.dataset.u});toast(error?errTxt(error):'Pessoa removida do laboratório');await loadMembers();applyUsers();render()}
 },true);
