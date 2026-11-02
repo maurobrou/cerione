@@ -3866,6 +3866,78 @@ document.addEventListener('change',e=>{const t=e.target;if(t.id==='imp-file'&&t.
  V.servicos=(...a)=>{const s=_vs(...a);return !(can('preco')||can('admin'))?s:s.replace('<button class="btn primary" data-act="svc-open">+ Novo serviço</button>','<button class="btn" data-imp-open="services">Importar planilha</button><button class="btn primary" data-act="svc-open">+ Novo serviço</button>')};}
 
 V.portal=()=>head('Pedidos do portal','Pedidos que os dentistas enviam pelo portal do laboratório.')+'<section class="panel"><p class="sub" style="margin:0">O portal do dentista funciona na versão online do CERIONE.</p></section>';
+/* ================= Qualidade: retrabalho por motivo + foto obrigatória na saída da conferência ================= */
+const RMK_REASONS=[['cor','Cor / estética'],['adapt','Adaptação / assentamento'],['ocl','Oclusão / contato'],['forma','Forma / anatomia'],['frat','Fratura ou trinca'],['cad','Erro no desenho (CAD)'],['fres','Falha de fresagem ou impressão'],['cer','Falha na cerâmica'],['molde','Moldagem ou escaneamento do dentista'],['info','Pedido com informação errada ou faltando'],['transp','Dano no transporte'],['mud','Mudança pedida pelo dentista ou paciente'],['outro','Outro']];
+const RMK_ORIG=[['lab','Laboratório'],['dent','Dentista / clínica'],['pac','Paciente'],['ind','Indefinido']];
+const RMK_DEF={molde:'dent',info:'dent',mud:'dent',transp:'ind'};
+const RMK_F=['remakeReason','remakeOrigin','remakeStage','remakeOf','remakeTech','remakeNote'];
+const rmkName=k=>(RMK_REASONS.find(x=>x[0]===k)||[0,k?k:'Sem motivo informado'])[1];
+const rmkOrig=k=>(RMK_ORIG.find(x=>x[0]===k)||[0,'Não informado'])[1];
+function rmkFields(){const d=draft||{};if(!d.remake)return'';const sel=(key,opts,ph)=>`<select data-d="${key}" id="rm-${key}"><option value="">${ph}</option>${opts.map(([k,n])=>`<option value="${k}" ${d[key]===k?'selected':''}>${esc(n)}</option>`).join('')}</select>`;
+  const team=(S.team||[]).filter(t=>t.active!==false);
+  return`<div class="field" id="rm-box" style="grid-column:1/-1;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk)"><span class="lbl">Dados do retrabalho (para medir os motivos)</span>
+   <div class="form-grid" style="margin-top:8px">${fld('rm-remakeReason','Motivo *',sel('remakeReason',RMK_REASONS,'Escolha o motivo'))}${fld('rm-remakeOrigin','Origem do problema',sel('remakeOrigin',RMK_ORIG,'Escolha a origem'))}
+    ${fld('rm-remakeStage','Etapa onde falhou',sel('remakeStage',STAGES.map(s=>[s.id,s.n]),'Não sei / não se aplica'))}${fld('rm-remakeTech','Responsável pela etapa',sel('remakeTech',team.map(t=>[t.id,t.name]),'Não identificar'))}
+    ${fld('rm-remakeOf','OS original',`<input id="rm-remakeOf" data-d="remakeOf" inputmode="numeric" value="${esc(d.remakeOf||'')}" placeholder="Ex.: 1042">`)}${fld('rm-remakeNote','Detalhe do problema',`<input id="rm-remakeNote" data-d="remakeNote" value="${esc(d.remakeNote||'')}" maxlength="200" placeholder="Ex.: ponto de contato aberto no 26">`)}</div></div>`}
+{const _rno=renderNewOrder;window.renderNewOrder=renderNewOrder=function(...a){const r=_rno(...a);try{const x=document.getElementById('no-remake');const box=document.getElementById('rm-box');if(box)box.remove();if(x&&draft&&draft.remake){const f=x.closest('.field');if(f)f.insertAdjacentHTML('afterend',rmkFields())}}catch(e){console.error(e)}return r};
+ const _eo=editOrder;window.editOrder=editOrder=function(id){const r=_eo(id);const o=S.orders.find(x=>x.id===id);if(o&&draft&&draft.editId===id&&!o.parent){RMK_F.forEach(k=>{if(o[k]!=null)draft[k]=o[k]});renderNewOrder()}return r};
+ const _co=createOrder;window.createOrder=createOrder=function(...a){const d=draft;const o=_co(...a);if(o&&d&&d.remake)RMK_F.forEach(k=>{const v=String(d[k]??'').trim();if(v)o[k]=v});return o};
+ const _uo=updateOrder;window.updateOrder=updateOrder=function(...a){const d=draft;const o=_uo(...a);if(o&&d){RMK_F.forEach(k=>{const v=String(d[k]??'').trim();if(d.remake&&v)o[k]=v;else delete o[k]})}return o}}
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&(t.dataset.d==='remakeOf'||t.dataset.d==='remakeNote')&&draft)draft[t.dataset.d]=t.value});
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset&&t.dataset.d==='remakeReason'&&draft){if(!draft.remakeOrigin){draft.remakeOrigin=RMK_DEF[t.value]||'lab';const o=document.getElementById('rm-remakeOrigin');if(o)o.value=draft.remakeOrigin}}});
+document.addEventListener('submit',e=>{if(e.target.id!=='noForm'||!draft||!draft.remake||draft.remakeReason)return;e.preventDefault();e.stopImmediatePropagation();renderNewOrder('Informe o motivo do retrabalho: é ele que mostra onde o laboratório está perdendo dinheiro.')},true);
+
+/* custo estimado de refazer: material + mão de obra das etapas (por elemento) */
+const rmkCost=o=>{const s=svcOf(o),n=q(o);return r2((matCostSvc(s)+Object.values(s.rates||{}).reduce((a,x)=>a+(+x||0),0))*n)};
+{const i=REPORTS.findIndex(r=>r.id==='retrab');if(i>=0)REPORTS[i]={...REPORTS[i],d:'Retrabalhos do período com motivo, origem, etapa e custo estimado de refazer.',
+  run(F){const L=S.orders.filter(o=>o.remake&&!o.parent&&mine(o)&&inP(o.created,F)&&(!F.cli||o.client===F.cli));
+   return{cols:[['Data','d'],['OS','t'],['Dentista','t'],['Serviço','t'],['Dentes / qtd.','t'],['Motivo','t'],['Origem','t'],['Etapa','t'],['OS original','t'],['Detalhe','t'],['Custo estimado','m'],['Situação','t']],
+    rows:L.map(o=>[o.created,o.num,cliOf(o.client).name,svcOf(o).name,teethTxt(o),rmkName(o.remakeReason),rmkOrig(o.remakeOrigin),o.remakeStage?SN[o.remakeStage]||o.remakeStage:'',o.remakeOf||'',o.remakeNote||o.notes||'',rmkCost(o),RSTAT[o.status]||o.status]),tot:{10:1}}}};
+ REPORTS.splice(i+1,0,{id:'retrabmot',g:'Produção',n:'Retrabalhos por motivo',d:'Quantos retrabalhos, por qual motivo, de quem foi a origem e quanto custaram para refazer. Agrupe por motivo, origem, dentista, etapa, responsável ou serviço.',f:['cli','svc'],
+  o:['Agrupar por',[['mot','Motivo'],['ori','Origem'],['cli','Dentista'],['st','Etapa onde falhou'],['tec','Responsável'],['svc','Serviço']]],
+  run(F){const g=F.opt||'mot',ok=o=>(!F.cli||o.client===F.cli)&&(!F.svc||o.service===F.svc);
+   const base=S.orders.filter(o=>!o.parent&&o.status!=='cancelado'&&mine(o)&&inP(o.created,F)&&ok(o)),R=base.filter(o=>o.remake);
+   const key=o=>g==='mot'?rmkName(o.remakeReason):g==='ori'?rmkOrig(o.remakeOrigin):g==='cli'?cliOf(o.client).name:g==='st'?(o.remakeStage?SN[o.remakeStage]||o.remakeStage:'Não informada'):g==='tec'?(o.remakeTech?techOf(o.remakeTech).name:'Não identificado'):svcOf(o).name;
+   const m={};R.forEach(o=>{const k=key(o),e=m[k]=m[k]||{n:0,el:0,c:0,lab:0};e.n++;e.el+=q(o);e.c+=rmkCost(o);if(o.remakeOrigin==='lab')e.lab++});
+   const rows=Object.entries(m).sort((a,b)=>b[1].n-a[1].n||b[1].c-a[1].c),tot=R.length,cost=R.reduce((a,o)=>a+rmkCost(o),0),labN=R.filter(o=>o.remakeOrigin==='lab').length,dentN=R.filter(o=>o.remakeOrigin==='dent').length,sem=R.filter(o=>!o.remakeReason).length;
+   const head={mot:'Motivo',ori:'Origem',cli:'Dentista',st:'Etapa onde falhou',tec:'Responsável',svc:'Serviço'}[g];
+   return{cols:[[head,'t'],['Retrabalhos (OS)','n'],['Elementos','n'],['% dos retrabalhos','p'],['Origem no laboratório','n'],['Custo estimado','m'],['Custo médio','m']],
+    rows:rows.map(([k,e])=>[k,e.n,e.el,tot?e.n/tot*100:0,e.lab,r2(e.c),e.n?r2(e.c/e.n):0]),tot:{1:1,2:1,4:1,5:1},
+    kpi:[['Retrabalhos',tot+' de '+base.length+' OS ('+pct(base.length?tot/base.length*100:0)+')'],['Custo estimado',fmt(cost)],['Motivo principal',rows.length&&g==='mot'?rows[0][0]:(()=>{const c={};R.forEach(o=>{const k=rmkName(o.remakeReason);c[k]=(c[k]||0)+1});const t=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];return t?t[0]:'—'})()],
+     ['Origem no laboratório',pct(tot?labN/tot*100:0)],['Origem no dentista',pct(tot?dentN/tot*100:0)],...(sem?[['Sem motivo informado',sem+' OS']]:[])]}}});}
+
+/* ---------- foto obrigatória ao concluir a conferência ---------- */
+const QC_ST='con',qcOn=()=>S.settings.qcPhoto!==false;
+const qcHas=o=>(o.qc||[]).some(p=>p.stage===QC_ST&&p.h===o.history.length);
+const qcCloud=()=>!!(window.CERIONE_CLOUD&&CERIONE_CLOUD.lab&&CERIONE_CLOUD.sb);
+function qcShrink(file,max,qual){return new Promise((res,rej)=>{const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?res({blob:b,url:c.toDataURL('image/jpeg',qual)}):rej(new Error('img')),'image/jpeg',qual)};img.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('img'))};img.src=u})}
+let QCD=null;
+function qcModal(id,done){const o=find('orders',id);if(!o)return;QCD={id,done,file:null,prev:null};
+  openModal(mhead('Foto da conferência','OS '+o.num+' · '+esc(svcOf(o).name))+`<div class="grid" id="qc-box"><p class="sub" style="margin:0">Para concluir a conferência, registre uma foto do trabalho pronto: boa luz, fundo neutro e o trabalho no modelo, se tiver. A foto fica na OS${qcCloud()?' e aparece para o dentista no portal':''}.</p>
+   <label class="btn primary" style="justify-content:center;cursor:pointer">📷 Tirar ou escolher foto<input type="file" id="qc-file" accept="image/*" capture="environment" hidden></label><div id="qc-prev"></div>
+   <div class="checks" style="flex-direction:column;gap:4px"><label><input type="checkbox" data-qc="adapt"> Adaptação conferida</label><label><input type="checkbox" data-qc="cor"> Cor conferida com a escala</label><label><input type="checkbox" data-qc="ocl"> Oclusão e contatos conferidos</label></div>
+   ${fld('qc-note','Observação (opcional)','<input id="qc-note" maxlength="200" placeholder="Ex.: ajuste leve na oclusal">')}
+   <div class="sheet-foot"><span class="err" id="qc-err"></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button type="button" class="btn primary" id="qc-go" disabled>Salvar foto e concluir</button></div></div></div>`)}
+document.addEventListener('change',async e=>{if(e.target.id!=='qc-file'||!QCD)return;const f=e.target.files[0];if(!f)return;const er=document.getElementById('qc-err');er.textContent='';
+  try{const r=await qcShrink(f,qcCloud()?1600:900,qcCloud()?.82:.7);QCD.file=r;document.getElementById('qc-prev').innerHTML=`<img src="${r.url}" alt="Prévia da foto" style="max-width:100%;max-height:260px;border-radius:10px;display:block;margin:0 auto">`;document.getElementById('qc-go').disabled=false}
+  catch(err){er.textContent='Não foi possível ler esta imagem. Tente outra foto.'}});
+document.addEventListener('click',async e=>{if(e.target.id!=='qc-go'||!QCD||!QCD.file)return;const b=e.target,er=document.getElementById('qc-err'),o=find('orders',QCD.id);if(!o)return;b.disabled=true;b.textContent='Salvando…';
+  const checks=[...document.querySelectorAll('[data-qc]:checked')].map(x=>x.dataset.qc),note=(document.getElementById('qc-note')||{}).value||'',u=curUser();
+  const rec={stage:QC_ST,h:o.history.length,at:new Date().toISOString(),by:u?u.name:'',checks,note:note.trim()};
+  try{if(qcCloud()){const C2=CERIONE_CLOUD,path=`${C2.lab.id}/${o.id}/${Date.now()}.jpg`;const{error}=await C2.sb.storage.from('qualidade').upload(path,QCD.file.blob,{contentType:'image/jpeg',upsert:false});if(error)throw error;rec.path=path}else rec.data=QCD.file.url;
+    o.qc=[...(o.qc||[]),rec];const done=QCD.done;QCD=null;closeModal();done()}
+  catch(err){console.error(err);er.textContent='Não foi possível salvar a foto. Confira a internet e tente de novo.';b.disabled=false;b.textContent='Salvar foto e concluir'}});
+{const _adv=advance;window.advance=advance=function(id,...a){const o=find('orders',id);if(o&&qcOn()&&curStage(o)===QC_ST&&!qcHas(o)){setTimeout(()=>qcModal(id,()=>{_adv(id,...a);render();if(document.getElementById('scan-res'))document.getElementById('scan-res').innerHTML=''}),0);return}return _adv(id,...a)}}
+/* fotos na ficha da OS */
+async function qcSrc(p){if(p.data)return p.data;if(!p.path||!qcCloud())return'';try{const{data}=await CERIONE_CLOUD.sb.storage.from('qualidade').createSignedUrl(p.path,3600);return data?data.signedUrl:''}catch(e){return''}}
+{const _oo=openOrder;window.openOrder=openOrder=function(id,...a){const r=_oo(id,...a);try{let o=find('orders',id);if(o&&o.parent)o=find('orders',o.parent)||o;const P=(o&&o.qc)||[];if(P.length){const sh=document.getElementById('sheet');
+   if(sh&&!document.getElementById('qc-sec')){sh.insertAdjacentHTML('beforeend',`<section id="qc-sec" style="margin-top:14px"><span class="lbl">Conferência de qualidade</span><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">${P.map((p,i)=>`<figure style="margin:0;width:150px"><a data-qc-i="${i}" target="_blank" rel="noopener"><img data-qc-img="${i}" alt="Foto da conferência" style="width:150px;height:110px;object-fit:cover;border-radius:10px;background:var(--sunk);display:block"></a><figcaption class="mut" style="font-size:11.5px;margin-top:4px">${new Date(p.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${p.by?' · '+esc(p.by):''}${(p.checks||[]).length?' · '+p.checks.length+'/3 itens':''}${p.note?'<br>'+esc(p.note):''}</figcaption></figure>`).join('')}</div></section>`);
+    P.forEach(async(p,i)=>{const s=await qcSrc(p);const im=document.querySelector(`[data-qc-img="${i}"]`),a=document.querySelector(`[data-qc-i="${i}"]`);if(im&&s){im.src=s;if(a)a.href=s}})}}}catch(e){console.error(e)}return r}}
+/* configuração */
+{const _ca=cfgAlerts;window.cfgAlerts=cfgAlerts=function(){return _ca()+(can('admin')?`<section class="panel"><h2>Qualidade</h2><label class="checks"><input type="checkbox" data-qc-set="1" ${qcOn()?'checked':''}> Exigir foto do trabalho ao concluir a conferência</label><p class="sub" style="margin:6px 0 0">A OS só sai da conferência com a foto registrada. Os retrabalhos pedem o motivo; veja em Relatórios → Retrabalhos por motivo.</p></section>`:'')}}
+document.addEventListener('change',e=>{if(e.target.dataset&&e.target.dataset.qcSet){S.settings.qcPhoto=e.target.checked;save();toast(e.target.checked?'Foto obrigatória na conferência ativada':'Foto na conferência deixou de ser obrigatória')}});
+
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}
