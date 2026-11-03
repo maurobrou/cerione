@@ -957,7 +957,7 @@ doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/>',search:'<c
 const ico=(k,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
 const MODS_ALL=[
  {id:'inicio',n:'Início',ic:'home',d:'Resumo do dia: produção, financeiro e pendências.',items:[['painel','Painel']]},
- {id:'producao',n:'Produção',ic:'tooth',d:'Ordens de serviço e o andamento de cada etapa.',items:[['trabalhos','Trabalhos (OS)'],['producao','Quadro de produção'],['portal','Pedidos do portal'],['pops','POPs']]},
+ {id:'producao',n:'Produção',ic:'tooth',d:'Ordens de serviço e o andamento de cada etapa.',items:[['trabalhos','Trabalhos (OS)'],['producao','Quadro de produção'],['portal','Pedidos dos dentistas'],['pops','POPs']]},
  {id:'clientes',n:'Clientes',ic:'users',d:'Dentistas, condições comerciais e mensagens.',items:[['clientes','Dentistas'],['mensagens','Mensagens']]},
  {id:'fin',n:'Financeiro',ic:'wallet',d:'Caixa, contas a receber e a pagar, fechamento e notas de serviço.',items:[['caixa','Fluxo de caixa'],['fechamento','Fechamento mensal'],['receber','Contas a receber'],['pagar','Contas a pagar'],['notas:saida','Notas fiscais (NFS-e)']]},
  {id:'estoque',n:'Estoque e compras',ic:'box',d:'Materiais, movimentações, notas de compra e fornecedores.',items:[['estoque:materiais','Materiais'],['estoque:movs','Movimentações'],['notas:entrada','Notas de compra (XML)'],['fornecedores','Fornecedores']]},
@@ -3458,7 +3458,7 @@ document.addEventListener('click',async e=>{const t=e.target.closest&&e.target.c
   if(a==='connect')waConnect();
   else if(a==='refresh'){t.disabled=true;await waRefresh();toast('Situação atualizada')}
   else if(a==='logout'){if(!confirm('Desconectar o WhatsApp do laboratório? Os avisos voltam a ser enviados manualmente.'))return;try{await WA_API.logout();WA.cfg.status='desconectado';WA.cfg.phone=null;toast('WhatsApp desconectado')}catch(er){toast(waErr(er))}waPaint()}
-  else if(a==='save'){const auto={on:document.getElementById('wa-on').checked,ev:[...document.querySelectorAll('[data-waev]')].filter(x=>x.checked).map(x=>x.dataset.waev)};
+  else if(a==='save'){const auto={...((WA.cfg&&WA.cfg.auto)||{}),on:document.getElementById('wa-on').checked,ev:[...document.querySelectorAll('[data-waev]')].filter(x=>x.checked).map(x=>x.dataset.waev)};
     try{await WA_API.setAuto(auto);WA.cfg.auto=auto;toast('Envio automático salvo');waPaint();waKick()}catch(er){toast(waErr(er))}}
   else if(a==='test'){const ph=waNum(document.getElementById('wa-test').value);if(ph.length<12){toast(WA_ERR.invalid_phone);return}t.disabled=true;
     try{await WA_API.send({key:null,phone:ph,text:`Teste do CERIONE: o WhatsApp do ${S.settings.lab||'laboratório'} está conectado e pronto para avisar os dentistas. ✅`,ev:null,client:'Teste'});toast('Mensagem de teste enviada')}catch(er){toast(waErr(er))}t.disabled=false;WA.log=null;waPaint()}
@@ -3865,7 +3865,7 @@ document.addEventListener('change',e=>{const t=e.target;if(t.id==='imp-file'&&t.
  V.clientes=(...a)=>{const s=_vc(...a);return can('cli')||can('admin')?s.replace('<button class="btn primary" data-act="ent-form" data-k="clients">+ Novo cliente</button>','<button class="btn" data-imp-open="clients">Importar planilha</button><button class="btn primary" data-act="ent-form" data-k="clients">+ Novo cliente</button>'):s};
  V.servicos=(...a)=>{const s=_vs(...a);return !(can('preco')||can('admin'))?s:s.replace('<button class="btn primary" data-act="svc-open">+ Novo serviço</button>','<button class="btn" data-imp-open="services">Importar planilha</button><button class="btn primary" data-act="svc-open">+ Novo serviço</button>')};}
 
-V.portal=()=>head('Pedidos do portal','Pedidos que os dentistas enviam pelo portal do laboratório.')+'<section class="panel"><p class="sub" style="margin:0">O portal do dentista funciona na versão online do CERIONE.</p></section>';
+V.portal=()=>head('Pedidos dos dentistas','Pedidos que os dentistas enviam pelo portal e pelo WhatsApp.')+'<section class="panel"><p class="sub" style="margin:0">O portal do dentista e o agente de pedidos pelo WhatsApp funcionam na versão online do CERIONE.</p></section>';
 /* ================= Qualidade: retrabalho por motivo + foto obrigatória na saída da conferência ================= */
 const RMK_REASONS=[['cor','Cor / estética'],['adapt','Adaptação / assentamento'],['ocl','Oclusão / contato'],['forma','Forma / anatomia'],['frat','Fratura ou trinca'],['cad','Erro no desenho (CAD)'],['fres','Falha de fresagem ou impressão'],['cer','Falha na cerâmica'],['molde','Moldagem ou escaneamento do dentista'],['info','Pedido com informação errada ou faltando'],['transp','Dano no transporte'],['mud','Mudança pedida pelo dentista ou paciente'],['outro','Outro']];
 const RMK_ORIG=[['lab','Laboratório'],['dent','Dentista / clínica'],['pac','Paciente'],['ind','Indefinido']];
@@ -4018,6 +4018,23 @@ document.addEventListener('submit',e=>{const f=e.target;if(f.id!=='pvOutForm'&&f
     rows.sort((a,b)=>String(b[6]).localeCompare(String(a[6])));const fin=rows.filter(r=>r[8]!=='Com o dentista'),aj=fin.filter(r=>r[8]==='Ajuste').length,dias=fin.reduce((a,r)=>a+r[7],0);
     return{cols:[['Voltou em','d'],['OS','t'],['Dentista','t'],['Serviço','t'],['Paciente','t'],['Prova','t'],['Saiu em','d'],['Dias com o dentista','n'],['Resultado','t'],['Observação','t']],rows,
       kpi:[['Provas',String(rows.length)],['Com ajuste',fin.length?Math.round(aj/fin.length*100)+'%':'—'],['Média de dias no consultório',fin.length?(dias/fin.length).toFixed(1).replace('.',','):'—'],['Agora com o dentista',String(rows.filter(r=>r[8]==='Com o dentista').length)]]}}});}
+/* ================= Agente de pedidos pelo WhatsApp (IA lê as mensagens dos dentistas e monta o pedido) ================= */
+const WAI={n:null};
+WA_ERR.not_connected='Conecte o WhatsApp antes de ligar o agente de pedidos.';
+{const _wb=waBody;window.waBody=waBody=function(){const h=_wb(),c=WA.cfg;if(!c||!WA_API.online)return h;const on=!!(c.auto&&c.auto.ai),con=c.status==='conectado';
+  if(on&&WAI.n===null&&WA_API.aiMonth){WAI.n=-1;WA_API.aiMonth().then(n=>{WAI.n=n;waPaint()}).catch(()=>{WAI.n=0})}
+  return h+`<div id="wai-sec" style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+  <div class="sec-h"><h2 style="margin:0">Agente de pedidos com IA</h2>${on?'<span class="pill ok">Ligado</span>':'<span class="pill done">Desligado</span>'}</div>
+  <p class="sub" style="margin:6px 0 10px">A IA lê as mensagens que os <b>dentistas cadastrados</b> mandam para o WhatsApp do laboratório (texto, foto da ficha e arquivos) e monta o pedido em <b>Pedidos dos dentistas</b>. Alguém da equipe confere e cria a OS com um clique. Conversas com números que não são de dentistas não são lidas.</p>
+  <label class="checks"><input type="checkbox" id="wai-on" ${on?'checked':''} ${!con&&!on?'disabled':''}> Ler os pedidos dos dentistas com IA</label>
+  ${!con&&!on?'<p class="mut" style="font-size:12.5px;margin:6px 0 0">Conecte o WhatsApp acima para ligar o agente.</p>':''}
+  ${on?`<p class="mut" style="font-size:12.5px;margin:8px 0 0">${WAI.n>0?`<b>${WAI.n}</b> leitura(s) da IA neste mês. `:''}O celular do dentista precisa estar no cadastro dele (Clientes). Áudios ficam marcados para ouvir no WhatsApp, a menos que a transcrição esteja ativada.</p>`:''}</div>`}}
+document.addEventListener('change',async e=>{const t=e.target;if(t.id!=='wai-on')return;const on=t.checked,prev=(WA.cfg&&WA.cfg.auto)||{on:true,ev:WA_EV_DEF},auto={...prev,ai:on};t.disabled=true;
+  try{await WA_API.setAuto(auto);WA.cfg.auto=auto;
+    if(on){let r;try{r=await WA_API.hook()}catch(er){await WA_API.setAuto({...prev,ai:false}).catch(()=>{});WA.cfg.auto={...prev,ai:false};throw er}
+      toast(r&&r.ai_ready===false?'Agente ligado, mas a chave da IA ainda não foi configurada. Os pedidos começam a aparecer assim que ela for cadastrada.':'Agente ligado: os pedidos dos dentistas vão aparecer em Pedidos dos dentistas')}
+    else toast('Agente de pedidos desligado')}catch(er){t.checked=!on;toast(waErr(er))}
+  t.disabled=false;waPaint()});
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}

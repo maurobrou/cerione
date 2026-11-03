@@ -18,7 +18,7 @@ footer{max-width:820px;margin:0 auto;padding:0 16px 40px;color:var(--mut);font-s
 <header><div class="w"><a href="index.html">CERIONE</a><nav><a href="termos.html">Termos</a><a href="privacidade.html">Privacidade</a><a href="app/">Entrar</a></nav></div></header>
 <main><article>
 <h1>Política de privacidade</h1>
-<p class="ver">Versão de 2 de novembro de 2026</p>
+<p class="ver">Versão de 3 de novembro de 2026</p>
 <p>Esta política explica quais dados pessoais o CERIONE trata, para quê e como você pode exercer seus direitos, conforme a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018).</p>
 <div class="box"><b>Em resumo:</b> os dados do seu laboratório ficam guardados em servidores no Brasil (São Paulo). Nenhum outro laboratório consegue vê-los, nós não vendemos dados e não usamos os dados do seu laboratório para publicidade.</div>
 
@@ -35,11 +35,13 @@ footer{max-width:820px;margin:0 auto;padding:0 16px 40px;color:var(--mut);font-s
 <tr><td>E-mail e senha (guardada de forma cifrada) das pessoas da equipe</td><td>Login e controle de acesso</td><td>Execução de contrato</td></tr>
 <tr><td>Dados lançados pelo laboratório (dentistas, pacientes, OS, valores, equipe)</td><td>Funcionar o sistema para o laboratório</td><td>Definida pelo laboratório, como controlador</td></tr>
 <tr><td>Registros de acesso e de ações no sistema (data, hora, usuário, IP)</td><td>Segurança, auditoria e prevenção de fraude</td><td>Obrigação legal (Marco Civil da Internet); legítimo interesse</td></tr>
+<tr><td>Mensagens de WhatsApp enviadas pelos dentistas cadastrados ao número do laboratório (texto, fotos, arquivos e áudios), quando o laboratório liga o agente de pedidos</td><td>Montar automaticamente o pedido de trabalho para a equipe do laboratório conferir</td><td>Definida pelo laboratório, como controlador</td></tr>
 <tr><td>Origem do cadastro (como conheceu, campanha, indicação)</td><td>Medir canais de divulgação e pagar o programa de indicação</td><td>Legítimo interesse</td></tr>
 </tbody></table>
 
 <h2>3. Dados de pacientes</h2>
 <p>Ordens de serviço podem conter o nome do paciente e informações do trabalho protético, que são dados de saúde. Recomendamos registrar apenas o necessário (nome ou iniciais) e nunca anexar documentos sem necessidade. Esses dados ficam acessíveis só às pessoas do laboratório com perfil autorizado.</p>
+<p>Quando o laboratório liga o <b>agente de pedidos pelo WhatsApp</b>, o sistema lê apenas as mensagens de números cadastrados como dentistas do laboratório; conversas com outros números não são lidas nem guardadas. As mensagens lidas ficam guardadas por 60 dias para conferência e depois são apagadas; os arquivos anexados ficam com o pedido. Nenhuma OS é criada sem a conferência de uma pessoa da equipe.</p>
 
 <h2>4. Com quem compartilhamos</h2>
 <p>Usamos fornecedores que tratam dados em nosso nome, sob contrato e com medidas de segurança:</p>
@@ -48,7 +50,8 @@ footer{max-width:820px;margin:0 auto;padding:0 16px 40px;color:var(--mut);font-s
 <tr><td>Vercel</td><td>Hospedagem do site e do sistema</td><td>Rede global</td></tr>
 <tr><td>Asaas</td><td>Cobrança e pagamentos</td><td>Brasil</td></tr>
 <tr><td>Brevo</td><td>Envio de e-mails da conta (senha provisória, redefinição)</td><td>União Europeia</td></tr>
-<tr><td>Anthropic</td><td>Análises do CFO com IA, só quando o laboratório usa o recurso; recebe apenas números agregados, sem dados de pacientes</td><td>Estados Unidos</td></tr>
+<tr><td>Anthropic</td><td>Inteligência artificial. No CFO virtual, recebe apenas números agregados, sem dados de pacientes. No agente de pedidos pelo WhatsApp (só quando o laboratório liga), recebe o texto e as fotos das mensagens dos dentistas, que podem conter o nome do paciente, apenas para montar o pedido; pelo contrato da API, esses dados não são usados para treinar os modelos</td><td>Estados Unidos</td></tr>
+<tr><td>OpenAI</td><td>Transcrição de áudios do agente de pedidos, só quando esse recurso estiver ativado</td><td>Estados Unidos</td></tr>
 <tr><td>Servidor próprio de WhatsApp</td><td>Envio de avisos aos dentistas, só quando o laboratório ativa o recurso</td><td><span class="fill">Brasil</span></td></tr>
 </tbody></table>
 <p>Quando há transferência para fora do Brasil, ela segue o art. 33 da LGPD, com cláusulas contratuais e fornecedores com garantias de proteção adequadas. Também compartilhamos dados quando a lei ou uma autoridade exigir.</p>
