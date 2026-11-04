@@ -1,4 +1,4 @@
-# CERIONE · servidor de WhatsApp (Evolution API) — roda numa VM grátis da Oracle Cloud (Ampere A1, arm64)
+# CERIONE · servidor de WhatsApp (Evolution API) — roda numa VM Ubuntu (Google Cloud e2-micro, Oracle Cloud ou VPS)
 # Não edite as senhas aqui: elas ficam no arquivo .env, criado pelo instalar.sh
 services:
   evolution:
@@ -38,6 +38,7 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: always
+    command: postgres -c shared_buffers=32MB -c max_connections=30 -c work_mem=2MB
     environment:
       POSTGRES_USER: evolution
       POSTGRES_PASSWORD: ${PG_PASS}
@@ -46,7 +47,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
     volumes: [redis_data:/data]
   caddy:
     # HTTPS automático (Let's Encrypt) na frente da Evolution; só as portas 80 e 443 ficam abertas

@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-# CERIONE · instala o servidor de WhatsApp (Evolution API) numa VM Ubuntu da Oracle Cloud.
+# CERIONE · instala o servidor de WhatsApp (Evolution API) numa VM Ubuntu (Google Cloud e2-micro, Oracle Cloud ou qualquer VPS).
 # Uso (na VM):  bash instalar.sh            -> instala ou atualiza
 #               bash instalar.sh dominio.com -> usa um domínio próprio em vez do endereço grátis sslip.io
 set -euo pipefail
 cd "$(dirname "$0")"
 echo "== CERIONE · servidor de WhatsApp =="
+# máquina pequena (ex.: e2-micro grátis do Google, 1 GB): cria 2 GB de memória extra (swap) para tudo caber
+MEM_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+if [ "$MEM_MB" -lt 3000 ] && ! swapon --show | grep -q /swapfile; then
+  echo "-> Máquina com ${MEM_MB} MB de memória: criando 2 GB de swap..."
+  sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+  sudo chmod 600 /swapfile && sudo mkswap /swapfile >/dev/null && sudo swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+  echo 'vm.swappiness=20' | sudo tee /etc/sysctl.d/90-cerione.conf >/dev/null && sudo sysctl -q -p /etc/sysctl.d/90-cerione.conf || true
+fi
 if ! command -v docker >/dev/null 2>&1; then
   echo "-> Instalando o Docker..."
   curl -fsSL https://get.docker.com | sudo sh
