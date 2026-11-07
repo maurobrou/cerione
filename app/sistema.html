@@ -1024,7 +1024,7 @@ function onboarding(){
     ['fornecedores','Cadastre seus fornecedores',S.suppliers.length>0],
     ['estoque','Revise o custo dos materiais e lance o estoque atual (Entrada / ajuste)',S.moves.some(m=>m.type!=='saida')],
     ['equipe','Cadastre a equipe e as etapas de cada um',S.team.length>0],
-    ['servicos','Revise as fichas técnicas, preços e o status de margem de cada serviço',S.services.length>0],
+    ['servicos',S.services.length&&!S.services.some(x=>+x.price>0)?'Coloque o seu preço em cada serviço (as fichas técnicas já vêm prontas como modelo)':'Revise as fichas técnicas, preços e o status de margem de cada serviço',S.services.some(x=>+x.price>0)],
     ['clientes','Cadastre os dentistas e clínicas',S.clients.length>0],
     ['trabalhos','Crie o primeiro trabalho e leve-o até a entrega',S.orders.length>0]];
   const done=steps.filter(x=>x[2]).length;
@@ -3121,7 +3121,7 @@ document.addEventListener('submit',e=>{
     case'noForm':{
       if(S.settings.privIni!==false&&draft)draft.patient=toIni(draft.patient);
       if(draft.editId){const dc=draftCalc();if(dc.isEl&&!dc.n){renderNewOrder('Selecione ao menos um dente no odontograma.');return}if(!dc.n){renderNewOrder('Informe a quantidade.');return}const o=updateOrder();save();closeModal();render();openOrder(o.id);toast('Trabalho atualizado');break}
-      {const dc=draftCalc();if(dc.isEl&&!dc.n){renderNewOrder('Selecione ao menos um dente no odontograma.');return}if(!dc.n){renderNewOrder('Informe a quantidade.');return}if(!draft.remake&&!dc.price){renderNewOrder('Serviço sob consulta: informe o valor por unidade.');return}if(!draft.remake&&(draft.extras||[]).some(e=>!extraCalc(e,dc.cl).price)){renderNewOrder('Informe o valor dos itens adicionais sob consulta (ex.: link, análogo).');return}}
+      {const dc=draftCalc();if(dc.isEl&&!dc.n){renderNewOrder('Selecione ao menos um dente no odontograma.');return}if(!dc.n){renderNewOrder('Informe a quantidade.');return}if(!draft.remake&&!dc.price){renderNewOrder(dc.svc.consult?'Serviço sob consulta: informe o valor por unidade.':'Este serviço ainda não tem preço. Informe o valor por unidade ou cadastre o preço em Serviços.');return}if(!draft.remake&&(draft.extras||[]).some(e=>!extraCalc(e,dc.cl).price)){renderNewOrder('Informe o valor dos itens adicionais sob consulta (ex.: link, análogo).');return}}
       const o=createOrder();save();closeModal();render();setTimeout(()=>openOrder(o.id),30);toast(`OS ${o.num} criada${kidsOf(o).length?` com ${kidsOf(o).length+1} itens`:''} · material baixado do estoque${pendingMsgs().some(m=>m.order===o.id)?' · aviso ao dentista na fila':''}`);break}
     case'cliForm':{
       const data={name:v('cl-name'),clinic:v('cl-clinic'),doc:v('cl-doc'),city:v('cl-city'),phone:v('cl-phone'),email:v('cl-email'),term:v('cl-term'),dueDays:Math.max(0,+v('cl-due')||0),discount:Math.min(90,Math.max(0,+v('cl-disc')||0))};
