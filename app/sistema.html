@@ -489,7 +489,7 @@ const lastDay=k=>{const[y,m]=k.split('-').map(Number);return iso(new Date(y,m,0)
 const dayIn=(k,day)=>{const ld=+lastDay(k).slice(8);return k+'-'+String(Math.min(day,ld)).padStart(2,'0')};
 const q=o=>o.qty!=null?o.qty:o.teeth.length;
 const gross=o=>r2((+o.price||0)*q(o));
-const total=o=>o.remake?0:Math.max(0,r2(gross(o)-(+o.discAmt||0)));
+const total=o=>o.remake?0:r2(Math.max(0,r2(gross(o)-(+o.discAmt||0)))+compCharge(o));
 let _u=0;const uid=p=>p+Date.now().toString(36)+(_u++).toString(36)+Math.floor(Math.random()*1e3);
 let S;
 const UI={ordFilter:'ativos',q:'',ordClient:'',prodTech:'',svcTab:'servicos',svcCat:'',matQ:'',showArch:false,stockTab:'materiais',recTab:'geral',msgTab:'pendentes',recQ:'',dreSubs:true,payGrp:'',chSide:'pay',payTab:'aberto',month:monthKey(0),commMonth:monthKey(0),repRange:'3'};
@@ -960,7 +960,7 @@ const MODS_ALL=[
  {id:'producao',n:'Produção',ic:'tooth',d:'Ordens de serviço e o andamento de cada etapa.',items:[['trabalhos','Trabalhos (OS)'],['producao','Quadro de produção'],['portal','Pedidos dos dentistas'],['pops','POPs']]},
  {id:'clientes',n:'Clientes',ic:'users',d:'Dentistas, condições comerciais e mensagens.',items:[['clientes','Dentistas'],['mensagens','Mensagens']]},
  {id:'fin',n:'Financeiro',ic:'wallet',d:'Caixa, contas a receber e a pagar, fechamento e notas de serviço.',items:[['caixa','Fluxo de caixa'],['fechamento','Fechamento mensal'],['receber','Contas a receber'],['pagar','Contas a pagar'],['notas:saida','Notas fiscais (NFS-e)']]},
- {id:'estoque',n:'Estoque e compras',ic:'box',d:'Materiais, movimentações, notas de compra e fornecedores.',items:[['estoque:materiais','Materiais'],['estoque:movs','Movimentações'],['notas:entrada','Notas de compra (XML)'],['fornecedores','Fornecedores']]},
+ {id:'estoque',n:'Estoque e compras',ic:'box',d:'Materiais, movimentações, notas de compra e fornecedores.',items:[['estoque:materiais','Materiais'],['estoque:comp','Links e análogos'],['estoque:dev','Devoluções de dentistas'],['estoque:movs','Movimentações'],['notas:entrada','Notas de compra (XML)'],['fornecedores','Fornecedores']]},
  {id:'precos',n:'Custos e preços',ic:'tag',d:'Fichas técnicas, custos e o preço certo de cada serviço.',items:[['servicos:servicos','Fichas e preços'],['servicos:maoobra','Mão de obra'],['servicos:equip','Equipamentos'],['servicos:fixos','Custos fixos'],['servicos:resultado','Resultado e equilíbrio'],['reforma','Reforma tributária']]},
  {id:'equipe',n:'Equipe',ic:'team',d:'Profissionais, etapas e comissões.',items:[['equipe','Profissionais'],['comissoes','Comissões']]},
  {id:'gestao',n:'Gestão',ic:'chart',d:'Resultado, rentabilidade e plano de contas.',items:[['resultado','Resultado (DRE)'],['cfo','CFO virtual'],['relatorios','Rentabilidade'],['contas','Plano de contas'],['audit','Auditoria']]},
@@ -2461,7 +2461,7 @@ function invView(id){
   <div class="dl"><div><span class="k">Cliente</span>${esc(c.name)}</div><div><span class="k">Clínica</span>${esc(c.clinic||'—')}</div><div><span class="k">CPF/CNPJ</span>${esc(c.doc||'—')}</div><div><span class="k">Cidade</span>${esc(c.city||'—')}</div></div>
   <div style="overflow-x:auto"><table><thead><tr><th>OS</th><th>Entrega</th><th>Paciente</th><th>Trabalho</th><th>Dentes / qtd.</th><th class="n">Valor unit.</th><th class="n">Total</th></tr></thead><tbody>
   ${os.map(o=>`<tr><td class="mono">${o.num}</td><td class="mono">${dm(o.delivered)}</td><td>${esc(o.patient||'—')}</td><td>${esc(svcOf(o).name)}${o.urgent?' <span class="chip">urgente</span>':''}</td><td class="teeth">${teethTxt(o)}</td><td class="n">${fmt(o.price)}</td><td class="n">${fmt(total(o))}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sem itens.</td></tr>'}</tbody></table></div>
-  <div class="totals"><span>Subtotal ${fmt(inv.subtotal)}</span>${inv.discount?`<span>Desconto (${pct(inv.discountPct)}) −${fmt(inv.discount)}</span>`:''}<span class="big">Total ${fmt(inv.total)}</span></div>
+  <div class="totals"><span>Subtotal ${fmt(inv.subtotal)}</span>${inv.discount?`<span>Desconto (${pct(inv.discountPct)}) −${fmt(inv.discount)}</span>`:''}${inv.credit?`<span>Devolução de componentes −${fmt(inv.credit)}</span>`:''}<span class="big">Total ${fmt(inv.total)}</span></div>
   <div><span class="lbl">Pagamento · ${esc(inv.method)} · ${inv.parcels===1?'à vista':inv.parcels+' parcelas'}</span><div style="overflow-x:auto;margin-top:6px"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Situação</th><th class="n">Valor</th><th></th></tr></thead><tbody>
   ${rs.map(r=>`<tr><td>${esc(r.parcel||'1/1')}</td><td class="mono">${dmy(r.due)}</td><td>${finPill(r)}${isPaid(r)?` <span class="mut" style="font-size:12px">${esc(r.method||'')}${r.discount?` · desc. ${fmt(r.discount)}`:''}</span>`:''}</td><td class="n">${fmt(recVal(r))}</td><td class="n">${isPaid(r)?'':`<button class="btn sm primary" data-act="rec-pay" data-id="${r.id}">Receber</button>`}</td></tr>`).join('')}</tbody></table></div></div>
   ${payInfo()?`<div class="dl">${payInfo()}</div>`:''}
@@ -2473,7 +2473,7 @@ function invView(id){
 function invText(inv){const c=cliOf(inv.client),st=S.settings,os=inv.orders.map(x=>S.orders.find(o=>o.id===x)).filter(Boolean),rs=recsOf(inv);
   return[`*${st.lab||'Laboratório'} · Fatura Nº ${pad4(inv.num)}*`,`Cliente: ${c.name}${c.clinic?' · '+c.clinic:''}`,`Emissão: ${dmy(inv.issue)}`,'',
   ...os.map(o=>`• OS ${o.num} · ${svcOf(o).name} · ${teethTxt(o)}${o.patient?' · pac. '+o.patient:''}: ${fmt(total(o))}`),'',
-  `Subtotal: ${fmt(inv.subtotal)}`,...(inv.discount?[`Desconto: −${fmt(inv.discount)}`]:[]),`*Total: ${fmt(inv.total)}*`,'',
+  `Subtotal: ${fmt(inv.subtotal)}`,...(inv.discount?[`Desconto: −${fmt(inv.discount)}`]:[]),...(inv.credit?[`Devolução de links/análogos: −${fmt(inv.credit)}`]:[]),`*Total: ${fmt(inv.total)}*`,'',
   `Pagamento: ${inv.method}${inv.parcels>1?` em ${inv.parcels}x`:''}`,...rs.map(r=>`${r.parcel} · vence ${dmy(r.due)} · ${fmt(r.amount)}${isPaid(r)?' (pago)':''}`),
   ...(st.pixKey?['',`Chave PIX: ${st.pixKey}`]:[]),...(st.bank?[`Dados bancários: ${st.bank}`]:[]),...(inv.notes?['',inv.notes]:[])].join('\n')}
 function copyText(txt,okMsg){const fall=()=>{openModal(mhead('Copie o texto abaixo')+`<textarea id="cp-text" style="min-height:280px;font-family:var(--f-mono);font-size:12.5px">${esc(txt)}</textarea><p class="mut" style="margin:0;font-size:12.5px">Selecione tudo (Ctrl+A) e copie (Ctrl+C).</p>`,true)};
@@ -4118,6 +4118,213 @@ document.addEventListener('submit',e=>{const f=e.target;if(f.id!=='ptbForm')retu
 {const _co=clientOpen;window.clientOpen=clientOpen=function(id,...r){const x=_co(id,...r);const c=cliOf(id),sh=document.getElementById('sheet');
   const dl=sh&&[...sh.querySelectorAll('.dl .k')].find(k=>k.textContent==='Desconto');if(dl){dl.textContent='Tabela';dl.parentElement.lastChild.textContent=cliTabTxt(c)}
   const ft=sh&&sh.querySelector('.sheet-foot>div');if(ft)ft.insertAdjacentHTML('afterbegin',`<button class="btn" data-act="ptb-open" data-id="${id}">Tabela de preços</button>`);return x}}
+
+/* ================= Links, análogos e componentes protéticos: marca, modelo, estoque, uso na OS e devolução do dentista ================= */
+// Cada componente é um material do estoque com a ficha m.comp={type,brand,line,conn,plat,height,rot,code} e m.sale (preço cobrado do dentista).
+const cpV=id=>{const e=document.getElementById(id);return e?String(e.value??''):''};
+const CP_TYPES=[['analogo','Análogo de implante'],['analogo_mp','Análogo de mini pilar / multi-unit'],['analogo_dig','Análogo digital (modelo impresso)'],['link','Link / Ti-base (CAD/CAM)'],['minipilar','Mini pilar / multi-unit'],['munhao','Munhão universal'],['ucla','UCLA / cilindro calcinável'],['transfer','Transferente (moldeira aberta/fechada)'],['scanbody','Scanbody'],['parafuso','Parafuso protético'],['outro','Outro componente']];
+const CP_CONN=[['he','Hexágono externo (HE)'],['hi','Hexágono interno (HI)'],['cm','Cone Morse (CM)'],['gm','Grand Morse (GM)'],['mp','Mini pilar / multi-unit'],['outra','Outra']];
+const CP_BRANDS0=['Neodent','S.I.N.','Oral Fix','World Bio','Straumann','Nobel Biocare','Implacil De Bortoli','Conexão','FGM Arcsys','Titaniumfix','Singular','Intraoss','Bionnovation','Emfils','Kopp','Signo Vinces','Osstem','Dentoflex','Medens','Systhex'];
+const cpBrands=()=>{if(!Array.isArray(S.compBrands))S.compBrands=[...CP_BRANDS0];return S.compBrands};
+const cpT=(L,k)=>(L.find(x=>x[0]===k)||[,k||''])[1];
+const cpShortT=k=>({analogo:'Análogo',analogo_mp:'Análogo de mini pilar',analogo_dig:'Análogo digital',link:'Link / Ti-base',minipilar:'Mini pilar',munhao:'Munhão',ucla:'UCLA',transfer:'Transferente',scanbody:'Scanbody',parafuso:'Parafuso protético'})[k]||'Componente';
+const cpShortC=k=>({he:'HE',hi:'HI',cm:'CM',gm:'GM',mp:'MP'})[k]||'';
+const isComp=m=>!!(m&&m.comp);
+const cpName=c=>[cpShortT(c.type),c.brand,c.line,cpShortC(c.conn),c.plat,c.height?('cinta '+c.height+(/mm/i.test(c.height)?'':' mm')):'',c.rot==='sim'?'antirrotacional':c.rot==='nao'?'rotacional':''].filter(Boolean).join(' · ');
+const cpMats=()=>actv('materials').filter(isComp);
+const cpLabel=m=>`${m.name}${m.comp.code?' · ref. '+m.comp.code:''} (${qty(stockOf(m.id))} em estoque)`;
+function compCharge(o){return o&&!o.remake?r2((o.comps||[]).reduce((a,c)=>a+(+c.unit||0)*(+c.qty||0),0)):0}
+const cpRets=()=>{if(!Array.isArray(S.compRets))S.compRets=[];return S.compRets};
+const cpCredit=inv=>r2(cpRets().filter(r=>r.inv===inv.id).reduce((a,r)=>a+(+r.credit||0),0));
+const cpPending=cid=>cpRets().filter(r=>r.client===cid&&!r.inv&&+r.credit>0);
+const cpInvOf=oid=>S.invoices.find(i=>(i.orders||[]).includes(oid));
+const invOpenAmt=inv=>r2(recsOf(inv).filter(r=>!isPaid(r)).reduce((a,r)=>a+r.amount,0));
+
+/* ---- custo dos componentes do estoque entra no custo da OS ---- */
+{const _oc=orderCost;window.orderCost=orderCost=function(o,...a){const r=_oc(o,...a);const c=r2((o.comps||[]).filter(x=>x.src==='lab').reduce((s,x)=>s+(+x.cost||0)*(+x.qty||0),0));if(c&&!o.remake){r.m=r2(r.m+c);r.margin=r2(r.margin-c)}return r}}
+
+/* ---- fatura: devoluções abatem do total ---- */
+{const _ci=createInvoice;window.createInvoice=createInvoice=function(d,...a){
+  const pend=cpPending(d.client);if(!pend.length)return _ci(d,...a);
+  const os=d.orders.map(id=>S.orders.find(o=>o.id===id)).filter(Boolean),sub=r2(os.reduce((x,o)=>x+total(o),0)),net=r2(sub-sub*(+d.discountPct||0)/100);
+  let room=net;const take=[];pend.forEach(r=>{if(+r.credit<=room+0.009){take.push(r);room=r2(room-r.credit)}});
+  if(!take.length)return _ci(d,...a);
+  const inv=_ci(d,...a);if(!inv)return inv;take.forEach(r=>r.inv=inv.id);recalcInvoice(inv);
+  if((S.msgs||[]).some(m=>m.ev==='fatura'&&m.invoice===inv.id&&m.status==='pendente'))msgInvoice(inv);return inv}}
+{const _ri=recalcInvoice;window.recalcInvoice=recalcInvoice=function(inv,...a){
+  const cr=S.invoices.includes(inv)?cpCredit(inv):0;
+  if(!cr){inv.credit=0;return _ri(inv,...a)}
+  // calcula como sempre e depois tira o crédito das parcelas em aberto
+  const r=_ri(inv,...a);if(!S.invoices.includes(inv))return r;
+  inv.credit=Math.min(cr,r2(inv.subtotal-inv.discount));inv.total=r2(inv.subtotal-inv.discount-inv.credit);
+  const rs=recsOf(inv),paid=r2(rs.filter(isPaid).reduce((x,y)=>x+y.amount,0)),open=rs.filter(y=>!isPaid(y));
+  if(open.length){const rem=Math.max(0,r2(inv.total-paid)),base=Math.floor(rem/open.length*100)/100;open.forEach((y,k)=>y.amount=k===open.length-1?r2(rem-base*(open.length-1)):base)}
+  S.receivables=S.receivables.filter(y=>!(y.invoice===inv.id&&!isPaid(y)&&Math.abs(y.amount)<0.009&&y.parcel==='complemento'));
+  return r}}
+{const _di=deleteInvoice;window.deleteInvoice=deleteInvoice=function(id,...a){cpRets().forEach(r=>{if(r.inv===id)r.inv=null});return _di(id,...a)}}
+
+/* ---- ficha do componente ---- */
+let cpDraft=null;
+function cpForm(id){
+  const m=id?find('materials',id):null,c=m?{...m.comp}:{type:'analogo',brand:cpBrands()[0],line:'',conn:'gm',plat:'',height:'',rot:'',code:''};
+  cpDraft={id:id||null};const bs=[...new Set([...cpBrands(),c.brand].filter(Boolean))];
+  openModal(mhead(id?'Editar componente':'Novo link / análogo','Ficha técnica para separar por marca e modelo no estoque')+`<form id="cpForm" class="grid"><div class="form-grid">
+  ${fld('cp-type','Tipo',sel('cp-type',CP_TYPES,c.type))}
+  <div class="field"><label for="cp-brand">Marca</label><div style="display:flex;gap:6px">${sel('cp-brand',bs.map(b=>[b,b]),c.brand)}<button type="button" class="btn sm" data-cp-brand="1" title="Cadastrar outra marca">+ Marca</button></div></div>
+  ${fld('cp-line','Linha / sistema (ex.: Helix, Strong SW, Unitite)',inp('cp-line',c.line))}
+  ${fld('cp-conn','Conexão',sel('cp-conn',CP_CONN,c.conn))}
+  ${fld('cp-plat','Plataforma / diâmetro (ex.: 3.5, 4.1, Regular)',inp('cp-plat',c.plat,'text','list="cp-plats"'))}<datalist id="cp-plats">${['3.0','3.5','3.75','4.0','4.1','4.3','4.5','5.0','6.0','Estreita (NP)','Regular (RP)','Larga (WP)'].map(x=>`<option value="${x}">`).join('')}</datalist>
+  ${fld('cp-height','Altura de cinta / transmucoso (mm)',inp('cp-height',c.height))}
+  ${fld('cp-rot','Encaixe',sel('cp-rot',[['','Não se aplica'],['sim','Antirrotacional (unitário)'],['nao','Rotacional (múltiplo)']],c.rot))}
+  ${fld('cp-code','Código / referência do fabricante',inp('cp-code',c.code))}
+  ${fld('cp-name','Nome no estoque (em branco = automático)',inp('cp-name',m&&m.name!==cpName(m.comp)?m.name:''),true)}
+  ${fld('cp-cost','Custo unitário (compra) R$',inp('cp-cost',m?m.cost:'','number','step="0.01" min="0"'))}
+  ${fld('cp-sale','Preço cobrado do dentista R$',inp('cp-sale',m?m.sale??'':'','number','step="0.01" min="0"'))}
+  ${fld('cp-min','Estoque mínimo',inp('cp-min',m?m.min:0,'number','step="1" min="0"'))}
+  ${fld('cp-sup','Fornecedor',sel('cp-sup',supOpts(),m?m.sup:''))}
+  ${!id?fld('cp-qty','Quantidade em estoque hoje',inp('cp-qty',0,'number','step="1" min="0"')):''}
+  ${!id?fld('cp-lot','Lote (rastreabilidade, opcional)',inp('cp-lot','')):''}
+  </div><p class="mut" id="cp-prev" style="font-size:12.5px;margin:0"></p>
+  <div class="sheet-foot"><span></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></div></form>`);
+  cpPrev();
+}
+const cpRead=()=>({type:cpV('cp-type'),brand:cpV('cp-brand'),line:cpV('cp-line').trim(),conn:cpV('cp-conn'),plat:cpV('cp-plat').trim(),height:cpV('cp-height').trim(),rot:cpV('cp-rot'),code:cpV('cp-code').trim()});
+function cpPrev(){const e=document.getElementById('cp-prev');if(e&&document.getElementById('cp-type'))e.textContent='Vai aparecer como: '+(cpV('cp-name').trim()||cpName(cpRead()))}
+
+/* ---- uso na OS ---- */
+function cpUse(oid){const o=find('orders',oid),ms=cpMats();
+  if(!ms.length){toast('Cadastre os links e análogos em Estoque › Links e análogos primeiro');cpForm();return}
+  const byB={};ms.forEach(m=>(byB[m.comp.brand||'Outras']=byB[m.comp.brand||'Outras']||[]).push(m));
+  const opts=Object.keys(byB).sort().map(b=>`<optgroup label="${esc(b)}">${byB[b].sort((x,y)=>x.name.localeCompare(y.name)).map(m=>`<option value="${m.id}">${esc(cpLabel(m))}</option>`).join('')}</optgroup>`).join('');
+  openModal(mhead('Link / análogo na OS '+o.num,esc(cliOf(o.client).name))+`<form id="cpUseForm" data-id="${oid}" class="grid"><div class="form-grid">
+  <div class="field" style="grid-column:1/-1"><label for="cu-mat">Componente</label><select id="cu-mat">${opts}</select></div>
+  ${fld('cu-qty','Quantidade',inp('cu-qty',1,'number','step="1" min="1"'))}
+  ${fld('cu-src','Origem',sel('cu-src',[['lab','Do estoque do laboratório (dá baixa)'],['dent','Enviado pelo dentista (só registra)']],'lab'))}
+  ${fld('cu-unit','Cobrar do dentista (R$ por unidade)',inp('cu-unit','','number','step="0.01" min="0"'))}
+  ${fld('cu-note','Observação',inp('cu-note',''))}</div>
+  <p class="mut" style="font-size:12.5px;margin:0">O valor cobrado entra no total da OS e na fatura. Se o dentista devolver depois, use “Devolução” para voltar ao estoque e abater.</p>
+  <div class="sheet-foot"><button type="button" class="btn" data-cp-back="${oid}">Voltar</button><button class="btn primary" type="submit">Adicionar</button></div></form>`);
+  cpUseFill()}
+function cpUseFill(){const m=find('materials',cpV('cu-mat')),u=document.getElementById('cu-unit');if(!m||!u)return;u.value=cpV('cu-src')==='dent'?0:(m.sale??'')}
+function cpOsHtml(o){const cs=o.comps||[];const ed=can('os');
+  return`<div class="cp-os" style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="lbl">Links e análogos</span>${ed&&o.status!=='cancelado'?`<button class="btn sm" data-cp-use="${o.id}">+ Componente</button>`:''}</div>
+  ${cs.length?`<div style="overflow-x:auto;margin-top:6px"><table><tbody>${cs.map(c=>{const m=matOf(c.mat);return`<tr><td>${esc(m.name)}${m.comp&&m.comp.code?` <span class="mut mono" style="font-size:12px">${esc(m.comp.code)}</span>`:''}<div class="mut" style="font-size:12px">${c.src==='dent'?'enviado pelo dentista':'do estoque do laboratório'}${c.note?' · '+esc(c.note):''}${c.ret?` · devolvido ${qty(c.ret)}`:''}</div></td><td class="n">${qty(c.qty)} un</td><td class="n">${+c.unit?fmt(r2(c.unit*c.qty)):'<span class="mut">sem cobrança</span>'}</td><td class="n">${ed?`<button class="btn sm ghost" data-cp-del="${o.id}" data-k="${c.id}" title="Remover">✕</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="mut" style="font-size:12.5px;margin:4px 0 0">Nenhum componente nesta OS.</p>'}</div>`}
+{const _oo=openOrder;window.openOrder=openOrder=function(id,...a){const r=_oo(id,...a);try{let o=find('orders',id);if(o&&o.parent)o=find('orders',o.parent)||o;if(!o)return r;
+  const ft=document.querySelector('#sheet .sheet-foot');if(ft&&!document.querySelector('#sheet .cp-os'))ft.insertAdjacentHTML('beforebegin',cpOsHtml(o))}catch(e){console.error(e)}return r}}
+function cpAfterOs(o){const inv=cpInvOf(o.id);if(inv)recalcInvoice(inv)}
+
+/* ---- devolução do dentista ---- */
+let cpRet=null;
+function cpRetForm(cid,oid){
+  if(!cpMats().length){toast('Cadastre os links e análogos primeiro');return}
+  cpRet={client:cid||(oid?find('orders',oid).client:''),os:oid||'',date:addDays(0),items:[],dest:'next',note:''};
+  if(oid){const o=find('orders',oid);(o.comps||[]).forEach(c=>{const left=r2((+c.qty||0)-(+c.ret||0));if(left>0)cpRet.items.push({mat:c.mat,qty:left,unit:+c.unit||0,cond:'ok',from:c.id})})}
+  if(!cpRet.items.length)cpRet.items.push({mat:cpMats()[0].id,qty:1,unit:+cpMats()[0].sale||0,cond:'ok'});
+  cpRetRender()}
+function cpRetRender(){const d=cpRet,ms=cpMats().sort((a,b)=>a.name.localeCompare(b.name));
+  const cls=actv('clients'),oss=d.client?S.orders.filter(o=>o.client===d.client&&!o.parent&&(o.comps||[]).length).sort((a,b)=>b.created.localeCompare(a.created)).slice(0,40):[];
+  const credit=r2(d.items.reduce((a,i)=>a+(+i.unit||0)*(+i.qty||0),0));
+  const open=d.client&&can('fin')?S.invoices.filter(i=>i.client===d.client&&invOpenAmt(i)>=credit-0.009&&invOpenAmt(i)>0):[];
+  if(d.dest!=='next'&&d.dest!=='none'&&!open.some(i=>i.id===d.dest))d.dest='next';
+  openModal(mhead('Devolução de links e análogos','O que voltar bom entra de novo no estoque; o valor abate da fatura do dentista')+`<form id="cpRetForm" class="grid"><div class="form-grid">
+  ${fld('cr-cli','Dentista',sel('cr-cli',[['','Escolha…'],...cls.map(c=>[c.id,c.name])],d.client,'data-cr="client"'))}
+  ${fld('cr-date','Data',inp('cr-date',d.date,'date','data-cr="date"'))}
+  ${fld('cr-os','OS de origem (opcional)',sel('cr-os',[['','—'],...oss.map(o=>[o.id,`OS ${o.num} · ${o.patient||svcOf(o).name}`])],d.os,'data-cr="os"'),true)}</div>
+  <div style="overflow-x:auto"><table><thead><tr><th>Componente</th><th class="n">Qtd.</th><th>Condição</th><th class="n">Abater (R$/un)</th><th class="n">Total</th><th></th></tr></thead><tbody>
+  ${d.items.map((it,k)=>`<tr><td style="min-width:230px"><select data-cri="${k}" data-f="mat">${ms.map(m=>`<option value="${m.id}" ${m.id===it.mat?'selected':''}>${esc(m.name)}${m.comp.code?' · '+esc(m.comp.code):''}</option>`).join('')}</select></td>
+    <td class="n" style="width:80px"><input type="number" min="1" step="1" value="${it.qty}" data-cri="${k}" data-f="qty" style="width:70px;text-align:right"></td>
+    <td><select data-cri="${k}" data-f="cond"><option value="ok" ${it.cond==='ok'?'selected':''}>Bom, volta ao estoque</option><option value="bad" ${it.cond==='bad'?'selected':''}>Danificado, não volta</option></select></td>
+    <td class="n" style="width:110px"><input type="number" min="0" step="0.01" value="${it.unit}" data-cri="${k}" data-f="unit" style="width:95px;text-align:right"></td><td class="n mono">${fmt(r2(it.unit*it.qty))}</td>
+    <td class="n"><button type="button" class="btn sm ghost" data-cr-del="${k}" title="Tirar">✕</button></td></tr>`).join('')}
+  </tbody></table></div><div><button type="button" class="btn sm" data-cr-add="1">+ Item</button></div>
+  <div class="form-grid">${fld('cr-dest','Abater o valor',sel('cr-dest',[['next','Na próxima fatura do dentista'],...open.map(i=>[i.id,`Na fatura ${pad4(i.num)} em aberto (${fmt(invOpenAmt(i))} a receber)`]),['none','Não abater (só volta ao estoque)']],d.dest,'data-cr="dest"'))}${fld('cr-note','Observação',inp('cr-note',d.note,'text','data-cr="note"'))}</div>
+  <div class="sheet-foot"><span class="lbl">Crédito do dentista: <b>${fmt(d.dest==='none'?0:credit)}</b></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn primary" type="submit">Registrar devolução</button></div></div></form>`)}
+function cpRetDoc(r){const c=cliOf(r.client),inv=r.inv?find('invoices',r.inv):null;
+  return`<div class="doc"><div class="doc-h">${labHead()}<div class="no"><span class="mut" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em">Comprovante de devolução</span><b>Nº ${pad4(r.num)}</b><span class="mut" style="font-size:12.5px">${dmy(r.date)}</span></div></div>
+  <p><b>Dentista:</b> ${esc(c.name)}${c.clinic?' · '+esc(c.clinic):''}${r.os?` · <b>OS</b> ${esc(String((find('orders',r.os)||{}).num||''))}`:''}</p>
+  <table><thead><tr><th>Componente</th><th>Marca</th><th>Ref.</th><th class="n">Qtd.</th><th>Condição</th><th class="n">Valor</th></tr></thead><tbody>${r.items.map(i=>{const m=matOf(i.mat),cp=m.comp||{};return`<tr><td>${esc(m.name)}</td><td>${esc(cp.brand||'')}</td><td>${esc(cp.code||'')}</td><td class="n">${qty(i.qty)}</td><td>${i.cond==='ok'?'Recebido em bom estado':'Danificado'}</td><td class="n">${fmt(r2(i.unit*i.qty))}</td></tr>`}).join('')}</tbody></table>
+  <div class="totals"><span class="big">Crédito ${fmt(r.credit)}</span></div>
+  <p class="mut" style="font-size:12.5px">${r.credit>0?(inv?`Abatido na fatura nº ${pad4(inv.num)}.`:'Será abatido na próxima fatura.'):'Sem abatimento financeiro.'}${r.note?' '+esc(r.note):''}</p>
+  <p style="margin-top:36px">______________________________<br><span class="mut" style="font-size:12px">Recebido por (laboratório)</span></p></div>`}
+function cpRetOpen(id){const r=cpRets().find(x=>x.id===id);if(!r)return;
+  openModal(mhead('Devolução nº '+pad4(r.num),esc(cliOf(r.client).name))+cpRetDoc(r)+`<div class="sheet-foot"><button class="btn" data-cp-retundo="${r.id}" data-confirm="Desfazer esta devolução?">Desfazer</button><div style="display:flex;gap:8px"><button class="btn" data-act="close">Fechar</button><button class="btn primary" data-cp-retpdf="${r.id}">Baixar PDF</button></div></div>`)}
+
+/* ---- telas do estoque ---- */
+UI.cpQ=UI.cpQ||'';UI.cpB=UI.cpB||'';UI.cpT=UI.cpT||'';UI.cpC=UI.cpC||'';
+function cpTab(){const q=UI.cpQ.trim().toLowerCase(),all=listOf('materials').filter(isComp);
+  const list=all.filter(m=>(!UI.cpB||m.comp.brand===UI.cpB)&&(!UI.cpT||m.comp.type===UI.cpT)&&(!UI.cpC||m.comp.conn===UI.cpC)&&(!q||(m.name+' '+(m.comp.code||'')+' '+(m.comp.line||'')).toLowerCase().includes(q))).sort((a,b)=>(a.comp.brand||'').localeCompare(b.comp.brand||'')||a.name.localeCompare(b.name));
+  const byB={};all.forEach(m=>{const b=m.comp.brand||'—';byB[b]=(byB[b]||0)+Math.max(0,stockOf(m.id))});
+  const cust=S.orders.filter(o=>o.status==='producao').reduce((a,o)=>a+(o.comps||[]).filter(c=>c.src==='dent').reduce((x,c)=>x+(+c.qty||0),0),0);
+  const fsel=(k,opts,ph)=>`<select data-cpf="${k}" aria-label="${ph}"><option value="">${ph}</option>${opts.map(([v2,n])=>`<option value="${esc(v2)}" ${UI[k]===v2?'selected':''}>${esc(n)}</option>`).join('')}</select>`;
+  return`<div class="toolbar" style="flex-wrap:wrap"><input type="search" data-cpf="cpQ" placeholder="Buscar por nome, linha ou código…" value="${esc(UI.cpQ)}" style="flex:1;min-width:200px">
+  ${fsel('cpB',[...new Set(all.map(m=>m.comp.brand).filter(Boolean))].sort().map(b=>[b,b]),'Todas as marcas')}${fsel('cpT',CP_TYPES,'Todos os tipos')}${fsel('cpC',CP_CONN,'Todas as conexões')}
+  <button class="btn" data-cp-new="1">+ Link / análogo</button><button class="btn" data-cp-brands="1">Marcas</button><button class="btn primary" data-cp-ret="1">Devolução de dentista</button></div>
+  ${Object.keys(byB).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 10px">${Object.entries(byB).sort((a,b)=>b[1]-a[1]).map(([b,n])=>`<span class="chip">${esc(b)} · ${qty(n)} un</span>`).join('')}${cust?`<span class="chip">${qty(cust)} un do dentista em OS abertas</span>`:''}</div>`:''}`+
+  tbl(['Componente','Marca','Conexão','Plataforma','Código','#Em estoque','#Mínimo','#Custo','#Cobrado','Situação',''],list.map(m=>{const s=stockOf(m.id),c=m.comp;
+    return`<tr><td style="min-width:220px"><b style="font-weight:500">${esc(m.name)}</b>${archChip(m)}<div class="mut" style="font-size:12px">${esc(cpT(CP_TYPES,c.type))}${c.line?' · '+esc(c.line):''}${c.height?' · cinta '+esc(c.height):''}</div></td><td>${esc(c.brand||'—')}</td><td>${esc(cpShortC(c.conn)||cpT(CP_CONN,c.conn))}</td><td>${esc(c.plat||'—')}</td><td class="mono">${esc(c.code||'—')}</td>
+    <td class="n">${qty(s)}</td><td class="n">${qty(m.min||0)}</td><td class="n">${fmt(m.cost||0)}</td><td class="n">${m.sale!=null&&m.sale!==''?fmt(m.sale):'—'}</td><td>${s<0?'<span class="pill late">Negativo</span>':s<(m.min||0)?'<span class="pill late">Repor</span>':'<span class="pill ok">OK</span>'}</td>
+    <td class="n" style="white-space:nowrap"><button class="btn sm" data-act="mov-form" data-id="${m.id}">Movimentar</button> <button class="btn sm ghost" data-cp-edit="${m.id}">Editar</button></td></tr>`}),all.length?'Nenhum componente com esses filtros.':'Nenhum link ou análogo cadastrado. Clique em “+ Link / análogo”.')}
+function cpDevTab(){const rs=[...cpRets()].sort((a,b)=>b.date.localeCompare(a.date)||b.num-a.num);
+  return`<div class="toolbar"><span class="mut" style="flex:1;font-size:13px">Links e análogos devolvidos pelos dentistas. O que volta em bom estado entra no estoque e o valor abate da fatura.</span><button class="btn primary" data-cp-ret="1">+ Devolução</button></div>`+
+  tbl(['Nº','Data','Dentista','Itens','#Crédito','Abatimento'],rs.map(r=>{const inv=r.inv?find('invoices',r.inv):null;return`<tr class="click" data-cp-retopen="${r.id}"><td class="mono">${pad4(r.num)}</td><td class="mono">${dmy(r.date)}</td><td>${esc(cliOf(r.client).name)}</td><td>${r.items.map(i=>`${qty(i.qty)}× ${esc(matOf(i.mat).name)}`).join('<br>')}</td><td class="n">${fmt(r.credit)}</td><td>${!r.credit?'<span class="mut">sem valor</span>':inv?`<span class="pill ok">Fatura ${pad4(inv.num)}</span>`:'<span class="pill soon">Próxima fatura</span>'}</td></tr>`}),'Nenhuma devolução registrada.')}
+{const _ve=V.estoque;V.estoque=(...a)=>{const t=UI.stockTab;if(t==='comp')return head('Links e análogos','Componentes protéticos por marca, conexão e plataforma. Baixa na OS e volta ao estoque na devolução.')+cpTab();
+  if(t==='dev')return head('Devoluções de dentistas','Links e análogos devolvidos: voltam ao estoque e abatem da fatura.')+cpDevTab();return _ve(...a)}}
+
+/* ---- ações ---- */
+document.addEventListener('change',e=>{const t=e.target;
+  if(t.dataset.cpf){UI[t.dataset.cpf]=t.value;render();return}
+  if(t.id==='cu-mat'||t.id==='cu-src'){cpUseFill();return}
+  if(t.closest&&t.closest('#cpForm')){cpPrev();return}
+  if(t.dataset.cr&&cpRet){cpRet[t.dataset.cr]=t.value;if(t.dataset.cr==='client'){cpRet.os='';cpRet.dest='next'}
+    if(t.dataset.cr==='os'&&t.value){const o=find('orders',t.value);const its=(o.comps||[]).map(c=>({mat:c.mat,qty:r2((+c.qty||0)-(+c.ret||0)),unit:+c.unit||0,cond:'ok',from:c.id})).filter(x=>x.qty>0);if(its.length)cpRet.items=its}
+    if(t.dataset.cr!=='note')cpRetRender();return}
+  if(t.dataset.cri!=null&&cpRet){const it=cpRet.items[+t.dataset.cri],f=t.dataset.f;if(f==='mat'){it.mat=t.value;it.unit=+matOf(t.value).sale||0;delete it.from}else if(f==='cond')it.cond=t.value;else it[f]=Math.max(0,+t.value||0);cpRetRender()}},true);
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset.cpf==='cpQ'){clearTimeout(cpTab._t);cpTab._t=setTimeout(()=>{UI.cpQ=t.value;render();const s=document.querySelector('[data-cpf=cpQ]');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length)}},250)}else if(t.closest&&t.closest('#cpForm'))cpPrev()});
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-cp-new],[data-cp-edit],[data-cp-brand],[data-cp-brands],[data-cp-use],[data-cp-del],[data-cp-back],[data-cp-ret],[data-cp-retopen],[data-cp-retpdf],[data-cp-retundo],[data-cr-add],[data-cr-del]');if(!t)return;
+  e.preventDefault();e.stopPropagation();const D=t.dataset;
+  if(D.cpNew){if(!can('estoque'))return toast('Sem permissão para cadastrar no estoque');cpForm()}
+  else if(D.cpEdit){if(!can('estoque'))return toast('Sem permissão');cpForm(D.cpEdit)}
+  else if(D.cpBrand){const n=(prompt('Nome da marca (ex.: Neodent, S.I.N., Oral Fix)')||'').trim();if(!n)return;const L=cpBrands();if(!L.some(b=>b.toLowerCase()===n.toLowerCase()))L.push(n);save();const s=document.getElementById('cp-brand');if(s){s.insertAdjacentHTML('beforeend',`<option value="${esc(n)}">${esc(n)}</option>`);s.value=L.find(b=>b.toLowerCase()===n.toLowerCase());cpPrev()}}
+  else if(D.cpBrands){const L=cpBrands();openModal(mhead('Marcas de componentes','Aparecem na ficha do link / análogo')+`<form id="cpBrForm" class="grid"><textarea id="cpb-list" rows="12" style="width:100%">${esc(L.join('\n'))}</textarea><p class="mut" style="font-size:12.5px;margin:0">Uma marca por linha. Marcas já usadas em componentes continuam nos cadastros mesmo se apagadas daqui.</p><div class="sheet-foot"><span></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></div></form>`)}
+  else if(D.cpUse)cpUse(D.cpUse);
+  else if(D.cpBack)openOrder(D.cpBack);
+  else if(D.cpDel){const o=find('orders',D.cpDel),c=(o.comps||[]).find(x=>x.id===D.k);if(!c)return;if(c.ret){toast('Este item já teve devolução registrada. Desfaça a devolução primeiro.');return}
+    S.moves=S.moves.filter(m=>m.cpUse!==c.id);o.comps=o.comps.filter(x=>x.id!==c.id);(o.history=o.history||[]).push({at:new Date().toISOString(),note:`Componente removido: ${matOf(c.mat).name}`});cpAfterOs(o);save();openOrder(o.id);toast('Componente removido'+(c.src==='lab'?' e devolvido ao estoque':''))}
+  else if(D.cpRet){if(!can('estoque')&&!can('fin'))return toast('Sem permissão');cpRetForm(D.cpRet==='1'?'':D.cpRet,D.os||'')}
+  else if(D.cpRetopen)cpRetOpen(D.cpRetopen);
+  else if(D.cpRetpdf){const r=cpRets().find(x=>x.id===D.cpRetpdf),el=document.querySelector('#sheet .doc');if(r&&el)pdfSave(`devolucao-${pad4(r.num)}-${slug(cliOf(r.client).name)}.pdf`,'<div class="doc">'+el.innerHTML+'</div>')}
+  else if(D.cpRetundo){if(t.dataset.confirm&&!t.dataset.ok){t.dataset.ok=1;t.textContent=t.dataset.confirm;return}const r=cpRets().find(x=>x.id===D.cpRetundo);if(!r)return;const inv=r.inv?find('invoices',r.inv):null;
+    if(inv&&recsOf(inv).some(isPaid)&&invOpenAmt(inv)<0.009){toast('A fatura em que esta devolução foi abatida já está paga. Ajuste pelo financeiro.');return}
+    S.moves=S.moves.filter(m=>m.cpRet!==r.id);r.items.forEach(i=>{if(i.from&&r.os){const o=find('orders',r.os),c=o&&(o.comps||[]).find(x=>x.id===i.from);if(c)c.ret=Math.max(0,r2((+c.ret||0)-i.qty))}});
+    S.compRets=cpRets().filter(x=>x.id!==r.id);if(inv)recalcInvoice(inv);auditPush({act:'del',kind:'estoque',label:'Devolução '+pad4(r.num),txt:'Devolução de componentes desfeita'});save();closeModal();render();toast('Devolução desfeita')}
+  else if(D.crAdd){const m=cpMats()[0];cpRet.items.push({mat:m.id,qty:1,unit:+m.sale||0,cond:'ok'});cpRetRender()}
+  else if(D.crDel){cpRet.items.splice(+D.crDel,1);if(!cpRet.items.length){const m=cpMats()[0];cpRet.items.push({mat:m.id,qty:1,unit:+m.sale||0,cond:'ok'})}cpRetRender()}
+},true);
+document.addEventListener('submit',e=>{const f=e.target;if(!['cpForm','cpUseForm','cpRetForm','cpBrForm'].includes(f.id))return;e.preventDefault();e.stopImmediatePropagation();
+  if(f.id==='cpBrForm'){S.compBrands=[...new Set(cpV('cpb-list').split('\n').map(x=>x.trim()).filter(Boolean))];save();closeModal();render();toast('Marcas salvas');return}
+  if(f.id==='cpForm'){const c=cpRead();const nm=cpV('cp-name').trim()||cpName(c);const data={name:nm,cat:'Links e análogos',unit:'unidade',cost:Math.max(0,+cpV('cp-cost')||0),sale:cpV('cp-sale')===''?null:Math.max(0,+cpV('cp-sale')||0),min:Math.max(0,+cpV('cp-min')||0),sup:cpV('cp-sup'),comp:c};
+    if(cpDraft.id){Object.assign(find('materials',cpDraft.id),data)}else{const m={id:uid('m'),pkgPrice:0,pkgUnit:'',yield:0,...data};S.materials.push(m);const q0=Math.max(0,+cpV('cp-qty')||0);if(q0>0)S.moves.push({id:uid('mv'),mat:m.id,type:'entrada',qty:q0,date:addDays(0),ref:'Estoque inicial'+(cpV('cp-lot').trim()?' · lote '+cpV('cp-lot').trim():''),cost:m.cost})}
+    if(c.brand&&!cpBrands().includes(c.brand))cpBrands().push(c.brand);save();closeModal();UI.stockTab='comp';view='estoque';render();toast('Componente salvo');return}
+  if(f.id==='cpUseForm'){const o=find('orders',f.dataset.id),m=find('materials',cpV('cu-mat'));if(!o||!m)return;const n=Math.max(1,Math.round(+cpV('cu-qty')||1)),src=cpV('cu-src');
+    if(src==='lab'&&stockOf(m.id)<n&&!f.dataset.ok){f.dataset.ok=1;toast(`Estoque de ${m.name}: ${qty(stockOf(m.id))}. Clique em Adicionar de novo para lançar mesmo assim.`);return}
+    const c={id:uid('cp'),mat:m.id,qty:n,src,unit:Math.max(0,+cpV('cu-unit')||0),cost:+m.cost||0,note:cpV('cu-note').trim(),at:addDays(0)};(o.comps=o.comps||[]).push(c);
+    if(src==='lab')S.moves.push({id:uid('mv'),mat:m.id,type:'saida',qty:n,date:addDays(0),ref:'OS '+o.num+' · componente',cost:+m.cost||0,cpUse:c.id});
+    cpAfterOs(o);save();openOrder(o.id);toast('Componente lançado na OS');return}
+  if(f.id==='cpRetForm'){const d=cpRet;if(!d.client){toast('Escolha o dentista');return}const items=d.items.filter(i=>i.mat&&+i.qty>0);if(!items.length){toast('Inclua ao menos um item');return}
+    const credit=d.dest==='none'?0:r2(items.reduce((a,i)=>a+(+i.unit||0)*(+i.qty||0),0));
+    S.retSeq=(S.retSeq||0)+1;const r={id:uid('dv'),num:S.retSeq,client:d.client,date:d.date||addDays(0),os:d.os||null,items:items.map(i=>({mat:i.mat,qty:+i.qty,unit:d.dest==='none'?0:+i.unit||0,cond:i.cond,from:i.from||null})),credit,inv:null,note:(cpV('cr-note')||'').trim(),by:(curUser()||{}).name||''};
+    cpRets().push(r);
+    r.items.forEach(i=>{if(i.cond==='ok')S.moves.push({id:uid('mv'),mat:i.mat,type:'entrada',qty:i.qty,date:r.date,ref:`Devolução ${pad4(r.num)} · ${cliOf(r.client).name}`,cost:+matOf(i.mat).cost||0,cpRet:r.id});
+      if(i.from&&r.os){const o=find('orders',r.os),c=o&&(o.comps||[]).find(x=>x.id===i.from);if(c)c.ret=r2((+c.ret||0)+i.qty)}});
+    if(credit>0&&d.dest!=='next'&&d.dest!=='none'){const inv=find('invoices',d.dest);if(inv){r.inv=inv.id;recalcInvoice(inv);if((S.msgs||[]).some(m=>m.ev==='fatura'&&m.invoice===inv.id&&m.status==='pendente'))msgInvoice(inv)}}
+    auditPush({act:'add',kind:'estoque',label:'Devolução '+pad4(r.num),txt:`Devolução de ${r.items.length} item(ns) de ${cliOf(r.client).name}; crédito ${fmt(credit)}`});
+    save();render();cpRetOpen(r.id);toast('Devolução registrada');return}
+},true);
+
+/* ---- ficha do cliente e fatura mostram as devoluções ---- */
+{const _co=clientOpen;window.clientOpen=clientOpen=function(id,...a){const x=_co(id,...a);const sh=document.getElementById('sheet'),ft=sh&&sh.querySelector('.sheet-foot>div');
+  if(ft)ft.insertAdjacentHTML('beforeend',`<button class="btn" data-cp-ret="${id}">Devolução de componentes</button>`);
+  const p=cpPending(id);if(p.length&&sh){const cb=sh.querySelector('.costbox');if(cb)cb.insertAdjacentHTML('afterend',`<p class="mut" style="font-size:12.5px;margin:6px 0 0">Crédito de devolução a abater na próxima fatura: <b>${fmt(p.reduce((a,r)=>a+r.credit,0))}</b></p>`)}return x}}
 
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
