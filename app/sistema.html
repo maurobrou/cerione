@@ -3043,8 +3043,8 @@ document.addEventListener('change',e=>{
   if(!d.ui&&!d.q&&!modalOpen()&&['servicos','equipe','config'].includes(view)&&!can(view==='config'?'admin':'cad')){toast('Seu perfil não permite alterar aqui.');render();return}
   if(d.act==='assign'){const o=S.orders.find(x=>x.id===d.id);o.assign[d.st]=t.value;save();return}
   if(d.ui){UI[d.ui]=t.value;render();return}
-  if(d.dx&&draft){const e=draft.extras[+d.i];if(d.dx==='service'){e.service=t.value;e.priceTxt=''}else e[d.dx]=t.value;renderNewOrder();return}
-  if(d.d&&draft){draft[d.d]=t.type==='checkbox'?t.checked:t.value;if(d.d==='service'){draft.priceTxt='';draft.qty=1}if(['client','service','remake','urgent','qty','priceTxt','discTxt'].includes(d.d))renderNewOrder();return}
+  if(d.dx&&draft){const e=draft.extras[+d.i];if(d.dx==='service'){e.service=t.value;e.priceTxt=''}else e[d.dx]=t.value;if(!(Date.now()-(window.__noSubAt||0)<1500))renderNewOrder();return}
+  if(d.d&&draft){draft[d.d]=t.type==='checkbox'?t.checked:t.value;if(d.d==='service'){draft.priceTxt='';draft.qty=1}if(['client','service','remake','urgent','qty','priceTxt','discTxt'].includes(d.d)&&!(Date.now()-(window.__noSubAt||0)<1500))renderNewOrder();return}
   if(d.sd&&svcDraft){const s=svcDraft,i=+d.i,v=t.value,nv=Math.max(0,+v||0),nb=v===''?null:nv;
     const TXT=['name','cat','notes','lstep'];
     switch(d.sd){
@@ -4035,6 +4035,29 @@ document.addEventListener('change',async e=>{const t=e.target;if(t.id!=='wai-on'
       toast(r&&r.ai_ready===false?'Agente ligado, mas a chave da IA ainda não foi configurada. Os pedidos começam a aparecer assim que ela for cadastrada.':'Agente ligado: os pedidos dos dentistas vão aparecer em Pedidos dos dentistas')}
     else toast('Agente de pedidos desligado')}catch(er){t.checked=!on;toast(waErr(er))}
   t.disabled=false;waPaint()});
+/* ================= Correção de valores depois de faturar: fatura, parcelas, previsão e aviso sempre coerentes ================= */
+{const _rc=recalcInvoice;window.recalcInvoice=recalcInvoice=function(inv,...a){const r=_rc(inv,...a);
+  if(!S.invoices.includes(inv))return r;
+  const rs=recsOf(inv),paid=r2(rs.filter(isPaid).reduce((x,y)=>x+y.amount,0)),open=rs.filter(y=>!isPaid(y)),rem=r2(inv.total-paid);
+  // fatura toda paga e o valor subiu: a diferença vira uma parcela de complemento (entra na previsão de recebimento)
+  if(!open.length&&rem>0.009){const cl=cliOf(inv.client);S.receivables.push({id:uid('r'),client:inv.client,invoice:inv.id,parcel:'complemento',desc:`Fatura ${pad4(inv.num)} · complemento`,amount:rem,issue:addDays(0),due:addDays(+cl.dueDays||0),status:'aberto',paidAt:null,method:inv.method})}
+  // complemento que ficou zerado (valor voltou ao que já foi pago): sai da lista
+  S.receivables=S.receivables.filter(y=>!(y.invoice===inv.id&&y.parcel==='complemento'&&!isPaid(y)&&Math.abs(y.amount)<0.009));
+  // aviso da fatura que ainda não saiu: atualiza o texto com o valor novo
+  if((S.msgs||[]).some(m=>m.ev==='fatura'&&m.invoice===inv.id&&m.status==='pendente'))msgInvoice(inv);
+  return r}}
+/* não deixa o valor ficar abaixo do que o dentista já pagou (a parcela ficaria negativa) */
+document.addEventListener('submit',e=>{const f=e.target;if(f.id!=='noForm'||!draft||!draft.editId)return;
+  const snap=JSON.stringify(S);let bad=null;
+  try{const o=updateOrder();const ids=[o.id,...kidsOf(o).map(k=>k.id)];const invs=[...new Set(ids.map(id=>invForOrder(id)).filter(Boolean))];
+    invs.forEach(inv=>{const paid=r2(recsOf(inv).filter(isPaid).reduce((x,y)=>x+y.amount,0));if(paid>inv.total+0.009)bad={num:inv.num,paid,total:inv.total}})}catch(er){console.error(er)}
+  S=JSON.parse(snap);
+  if(bad){e.preventDefault();e.stopImmediatePropagation();renderNewOrder(`Com esse valor a fatura Nº ${pad4(bad.num)} ficaria em ${fmt(bad.total)}, mas o dentista já pagou ${fmt(bad.paid)}. Para baixar o valor, primeiro estorne o recebimento no Financeiro (Contas a receber → Estornar) e depois corrija a OS.`)}},true);
+/* aviso no formulário de edição quando a OS já está faturada */
+{const _rno=renderNewOrder;window.renderNewOrder=renderNewOrder=function(...a){const r=_rno(...a);try{if(draft&&draft.editId){const inv=invForOrder(draft.editId),f=document.getElementById('noForm');
+  if(inv&&f&&!document.getElementById('inv-note')){const paid=recsOf(inv).some(isPaid);f.insertAdjacentHTML('afterbegin',`<p class="note" id="inv-note" style="margin:0">Esta OS já está na <b>fatura Nº ${pad4(inv.num)}</b>. Ao salvar, o total da fatura, as parcelas em aberto e a previsão de recebimento são recalculados${paid?'. As parcelas já pagas não mudam; se o valor subir e não houver parcela em aberto, a diferença vira uma parcela de complemento':''}.</p>`)}}}catch(er){}return r}}
+/* clicar em Salvar logo depois de digitar o valor: o formulário não se redesenha no meio do clique */
+document.addEventListener('pointerdown',e=>{if(e.target.closest&&e.target.closest('#noForm button[type=submit]'))window.__noSubAt=Date.now()},true);
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}
