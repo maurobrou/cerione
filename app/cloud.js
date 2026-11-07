@@ -419,6 +419,10 @@ C.boot=function(){if(!window.supabase||!CFG.url){screen('<div class="msg err">Co
   window.save=save=function(){try{auditDiff()}catch(e){}if(C.lab){if(C.st&&!C.st.can_write){setStatus('ro');return}setStatus('saving');schedule()}};
   window.cfgAccess=cfgAccess=function(){return cloudAccess()};
   V.portal=()=>ptView();
+  // na nuvem os dados ficam no servidor: some com backup local, recuperação do navegador, zerar/exemplos e importação do Precificador
+  if(typeof V.config==='function'){const _vc=V.config,HIDE=/^(Dados do Precificador|Recuperar dados anteriores|Backup dos dados|Dados fictícios|Dados do sistema)$/;
+    V.config=(...x)=>{const t=document.createElement('div');t.innerHTML=_vc(...x);t.querySelectorAll('section.panel').forEach(sc=>{const h2=sc.querySelector('h2');if(h2&&HIDE.test(h2.textContent.trim()))sc.remove()});
+      return t.innerHTML+(C.lab?`<section class="panel"><h2>Seus dados</h2><p class="sub" style="margin:0 0 12px">Tudo fica salvo automaticamente no servidor do CERIONE, com cópia a cada hora de uso guardada por 90 dias.${C.role==='dono'?' Para voltar a uma cópia anterior, use “Histórico”.':''}</p>${C.role==='dono'?'<div class="toolbar" style="margin:0"><button class="btn" data-cl="hist">Ver histórico</button></div>':''}</section>`:'')}}
   if(typeof clientOpen==='function'){const _co=clientOpen;window.clientOpen=clientOpen=function(id){_co(id);if(C.lab)ptPaintSec(id)}}
   if(typeof createOrder==='function'){const _cr=createOrder;window.createOrder=createOrder=function(){const pr=draft&&draft.portalReq;const o=_cr();if(pr&&o){ptSet(pr,'aceito','',o.num).then(()=>toast('Pedido do portal confirmado: virou a OS '+o.num)).catch(()=>{})}return o}}
   if(typeof cfgPlan==='function'){const _cp=cfgPlan;window.cfgPlan=cfgPlan=function(){const base=_cp();return C.bill?billPanel()+(C.role==='dono'?base.replace('Para contratar outros, fale com o CERIONE.','Para contratar outros, use “Mudar plano” acima.'):base):base}}
