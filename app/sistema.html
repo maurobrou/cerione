@@ -740,8 +740,8 @@ function precFat(){const st=S.settings,cur=monthKey(0),by={};S.orders.forEach(o=
 const ms=monthsBack(13).filter(k=>k<cur&&by[k]>0).slice(0,12);
 if(st.revSource!=='manual'&&ms.length>=3)return{v:ms.reduce((a,k)=>a+by[k],0)/ms.length,src:'os',n:ms.length};
 return{v:+st.revenue||0,src:'manual',n:ms.length}}
-function precTables(){const from=addDays(-90),rev={};S.orders.forEach(o=>{if(o.status!=='entregue'||!o.delivered||o.delivered<from)return;const d=+cliOf(o.client).discount||0;rev[d]=(rev[d]||0)+total(o)});
-const ds=[...new Set([0,...actv('clients').map(c=>+c.discount||0)])].sort((a,b)=>a-b),tot=Object.values(rev).reduce((a,v)=>a+v,0);
+function precTables(){const from=addDays(-90),rev={};S.orders.forEach(o=>{if(o.status!=='entregue'||!o.delivered||o.delivered<from)return;const d=cliDiscAvg(cliOf(o.client));rev[d]=(rev[d]||0)+total(o)});
+const ds=[...new Set([0,...actv('clients').map(c=>cliDiscAvg(c))])].sort((a,b)=>a-b),tot=Object.values(rev).reduce((a,v)=>a+v,0);
 return ds.map(d=>({id:d?'D'+d:'A',nome:d?'Desconto de '+pct(d):'Tabela cheia',ajuste:-d/100,share:tot>0?(rev[d]||0):(d?0:1)}))}
 const jobOf=(s,price=s.price,qtd=0)=>({id:s.id,nome:s.name,cat:s.cat,un:s.unit,preco:+price||0,precos:s.precos||null,mat:s.matFixed??null,matPct:s.matPct??null,comp:+s.comp||0,maq:+s.maqExtra||0,
 funcao:s.funcao||'',minTec:+s.minTec||0,minAux:+s.minAux||0,maqs:(s.eq||[]).filter(r=>r.name).map(r=>[r.name,+r.min||0]),frete:s.frete??null,retr:s.retr!=null&&s.retr!==''?(+s.retr)/100:null,
@@ -777,7 +777,7 @@ const STG_CACHE=new Map();
 function svcStage(base,st){const k=base.id+'|'+st;let v=STG_CACHE.get(k);if(!v||v._b!==base||v.name!==base.name+' · '+(SN[st]||st)){v={...base,name:base.name+' · '+(SN[st]||st),bom:[],stages:[],rates:{},_b:base,_stage:st};STG_CACHE.set(k,v)}return v}
 const stgList=s=>(s&&s.billByStage?s.stages.filter(st=>s.stagePrice&&s.stagePrice[st]!=null&&s.stagePrice[st]!==''):[]);
 const stgOpt=st=>st==='rem';/* remontagem: só quando precisar */
-function stgDefaults(svc,cl,urgent){const k=(1-(cl.discount||0)/100)*(urgent?1+(+S.settings.urgency||0)/100:1);return stgList(svc).map(st=>({st,on:!stgOpt(st),price:r2((+svc.stagePrice[st]||0)*k)}))}
+function stgDefaults(svc,cl,urgent){const k=cliK(svc,cl)*(urgent?1+(+S.settings.urgency||0)/100:1);return stgList(svc).map(st=>({st,on:!stgOpt(st),price:r2((+svc.stagePrice[st]||0)*k)}))}
 function stgEnsure(svc,cl){if(!draft||!svc.billByStage)return;const key=svc.id+'|'+cl.id+'|'+!!draft.urgent;if(draft.sbKey!==key&&!draft.sbEdited){draft.stageBill=stgDefaults(svc,cl,draft.urgent);draft.sbKey=key}}
 const stgSum=()=>r2((draft.stageBill||[]).filter(x=>x.on).reduce((a,x)=>a+(+x.price||0),0));
 function skipFwd(o){const st=svcOf(o).stages;while(o.idx<st.length&&(o.skip||[]).includes(st[o.idx]))o.idx++}
@@ -1106,11 +1106,11 @@ V.producao=()=>{
 
 V.clientes=()=>{
   const from=addDays(-90);
-  return head('Clientes','Dentistas e clínicas, com condição de pagamento e desconto aplicados automaticamente aos trabalhos.',archBtn('clients')+'<button class="btn primary" data-act="ent-form" data-k="clients">+ Novo cliente</button>')+
-  tbl(['Cliente','Clínica','Cidade','Condição','#Desconto','#Trabalhos 90d','#Faturado 90d','#Em aberto'],listOf('clients').map(c=>{
+  return head('Clientes','Dentistas e clínicas, cada um com a própria tabela de preços e condição de pagamento, aplicadas automaticamente aos trabalhos.',archBtn('clients')+'<button class="btn primary" data-act="ent-form" data-k="clients">+ Novo cliente</button>')+
+  tbl(['Cliente','Clínica','Cidade','Condição','Tabela de preços','#Trabalhos 90d','#Faturado 90d','#Em aberto'],listOf('clients').map(c=>{
     const os=S.orders.filter(o=>o.client===c.id&&o.created>=from);const fat=S.orders.filter(o=>o.client===c.id&&o.status==='entregue'&&o.delivered>=from).reduce((a,o)=>a+total(o),0);
     const open=S.receivables.filter(r=>r.client===c.id&&r.status!=='pago');const late=open.some(r=>daysTo(r.due)<0);
-    return`<tr class="click" data-act="cli-open" data-id="${c.id}"><td>${esc(c.name)}${archChip(c)}</td><td class="mut">${esc(c.clinic)}</td><td>${esc(c.city)}</td><td>${c.term==='mensal'?`Fechamento mensal · ${c.dueDays}d`:`Por entrega · ${c.dueDays}d`}</td><td class="n">${c.discount?pct(c.discount):'—'}</td><td class="n">${os.length}</td><td class="n">${fmt(fat)}</td><td class="n ${late?'neg':''}">${fmt(open.reduce((a,r)=>a+r.amount,0))}</td></tr>`}),'Nenhum cliente cadastrado. Clique em “+ Novo cliente” para começar.');
+    return`<tr class="click" data-act="cli-open" data-id="${c.id}"><td>${esc(c.name)}${archChip(c)}</td><td class="mut">${esc(c.clinic)}</td><td>${esc(c.city)}</td><td>${c.term==='mensal'?`Fechamento mensal · ${c.dueDays}d`:`Por entrega · ${c.dueDays}d`}</td><td>${cliOwn(c)?`<span class="chip">própria · ${cliOwn(c)}</span>`:c.discount?'−'+pct(c.discount):'<span class="mut">padrão</span>'}</td><td class="n">${os.length}</td><td class="n">${fmt(fat)}</td><td class="n ${late?'neg':''}">${fmt(open.reduce((a,r)=>a+r.amount,0))}</td></tr>`}),'Nenhum cliente cadastrado. Clique em “+ Novo cliente” para começar.');
 };
 
 let ROLE_LIST=[],MACH_LIST=[];
@@ -1482,7 +1482,7 @@ function fcDefaultMonth(){const prev=monthKey(-1);return unbilled().some(o=>!o.p
 function closingData(cid,k){
 const c=cliOf(cid),urg=(+S.settings.urgency||0)/100,from=k+'-01',to=lastDay(k);
 const roots=S.orders.filter(o=>o.client===cid&&!o.parent&&((o.status==='entregue'&&o.delivered>=from&&o.delivered<=to)||(o.stageBill&&o.status!=='cancelado'&&kidsOf(o).some(k=>k.billStage&&k.status==='entregue'&&k.delivered>=from&&k.delivered<=to)))).sort((a,b)=>fcDate(a,from,to).localeCompare(fcDate(b,from,to))||a.num-b.num);
-const line=o=>{const s=svcOf(o),n=q(o),charged=total(o),tp=o.billStage?(+((s._b||s).stagePrice||{})[o.billStage]||0):o.stageBill?0:s.price,tab=tp?r2(Math.max(tp*n*(o.urgent?1+urg:1),gross(o))):gross(o);return{o,s,n,tab,charged,disc:!o.remake&&tab>charged?r2(tab-charged):0,remakeVal:o.remake?r2((tp||0)*n):0}};
+const line=o=>{const s=svcOf(o),n=q(o),charged=total(o),cl0=cliOf(o.client),tp=o.billStage?r2((+((s._b||s).stagePrice||{})[o.billStage]||0)*cliK(s._b||s,cl0)):o.stageBill?0:cliPx(s,cl0),tab=tp?r2(Math.max(tp*n*(o.urgent?1+urg:1),gross(o))):gross(o);return{o,s,n,tab,charged,disc:!o.remake&&tab>charged?r2(tab-charged):0,remakeVal:o.remake?r2((tp||0)*n):0}};
 const rows=roots.map(o=>{const main=line(o),kids=kidsOf(o).filter(k=>k.status==='entregue'&&(!k.billStage||(k.delivered>=from&&k.delivered<=to))).map(line);const all=[main,...kids];return{o,main,kids,total:r2(all.reduce((a,x)=>a+x.charged,0)),tab:r2(all.reduce((a,x)=>a+(x.o.remake?0:x.tab),0)),disc:r2(all.reduce((a,x)=>a+x.disc,0)),remakeVal:r2(all.reduce((a,x)=>a+x.remakeVal,0)),ids:all.filter(x=>x.o.status==='entregue'&&!(x.o.stageBill&&!x.o.parent)).map(x=>x.o.id)}});
 const ids=rows.flatMap(r=>r.ids),invs=[...new Set(ids.map(id=>invForOrder(id)).filter(Boolean))],billed=new Set(invs.flatMap(i=>i.orders||[]));
 const unb=rows.filter(r=>!r.o.remake).flatMap(r=>r.ids).filter(id=>!billed.has(id)&&!find('orders',id).remake);
@@ -2074,7 +2074,7 @@ V.relatorios=()=>{
   const ths=['','#Trabalhos','#Elementos','#Receita','#Custo total','#Margem','#Margem %','#Margem/elemento'];
   return head('Rentabilidade','Quais serviços e quais clientes realmente dão lucro, considerando material, mão de obra, rateio fixo e impostos.',seg('repRange',[['1','Mês atual'],['3','3 meses'],['6','6 meses']]))+
   `<h2>Por serviço</h2>`+tbl(['Serviço',...ths.slice(1)],bySvc.map(([id,x])=>row(esc((find('services',id)||{name:'—'}).name),x)),'Sem entregas no período.')+
-  `<h2 style="margin-top:22px">Por cliente</h2>`+tbl(['Cliente',...ths.slice(1)],byCli.map(([id,x])=>row(esc(cliOf(id).name)+(cliOf(id).discount?` <span class="chip">−${pct(cliOf(id).discount)}</span>`:''),x)),'Sem entregas no período.')+
+  `<h2 style="margin-top:22px">Por cliente</h2>`+tbl(['Cliente',...ths.slice(1)],byCli.map(([id,x])=>row(esc(cliOf(id).name)+(cliOwn(cliOf(id))?' <span class="chip">tabela própria</span>':cliOf(id).discount?` <span class="chip">−${pct(cliOf(id).discount)}</span>`:''),x)),'Sem entregas no período.')+
   `<section class="panel"><h2>Retrabalhos no período</h2><p class="sub" style="margin:0">${rm.length} retrabalho${rm.length===1?'':'s'} de ${del.length} entregas (${del.length?pct(rm.length/del.length*100):'0,0%'}), custo sem receita de <b>${fmt(rm.reduce((a,o)=>{const c=orderCost(o);return a-c.margin},0))}</b>.</p></section>`;
 };
 
@@ -2153,11 +2153,11 @@ function closeModal(){scanStop();delete document.getElementById('modal').dataset
 const mhead=(title,sub='')=>`<div class="sheet-head"><div>${sub?`<span class="mono mut">${sub}</span>`:''}<h2>${title}</h2></div><button class="btn ghost" data-act="close" aria-label="Fechar">✕</button></div>`;
 
 function newOrder(){const ac=actv('clients'),as=actv('services');if(!ac.length||!as.length){closeModal();view=!ac.length?'clientes':'servicos';render();toast(!ac.length?'Cadastre um cliente antes de criar trabalhos':'Cadastre um serviço antes de criar trabalhos');return false}draft={teeth:[],client:ac[0].id,service:as[0].id,shade:'A2',due:addDays(7),patient:'',notes:'',remake:false,urgent:false,qty:1,priceTxt:'',discTxt:'',extras:[]};renderNewOrder()}
-function extraCalc(e,cl){const s=find('services',e.service)||{price:0,unit:'unidade'};const base=r2((s.price||0)*(1-(cl.discount||0)/100));const price=draft.remake?0:(e.priceTxt!==''&&e.priceTxt!=null?Math.max(0,+e.priceTxt||0):base);const n=Math.max(0,+e.qty||0);return{s,base,price,n,tot:r2(price*n)}}
+function extraCalc(e,cl){const s=find('services',e.service)||{price:0,unit:'unidade'};const base=cliPx(s,cl);const price=draft.remake?0:(e.priceTxt!==''&&e.priceTxt!=null?Math.max(0,+e.priceTxt||0):base);const n=Math.max(0,+e.qty||0);return{s,base,price,n,tot:r2(price*n)}}
 function draftCalc(){
   const svc=find('services',draft.service)||S.services[0],cl=cliOf(draft.client),isEl=(svc.unit||'elemento')==='elemento';
   const n=isEl?draft.teeth.length:Math.max(0,+draft.qty||0);
-  const base=r2(svc.price*(1-(cl.discount||0)/100)*(draft.urgent?1+(+S.settings.urgency||0)/100:1));
+  const base=r2(cliPx(svc,cl)*(draft.urgent?1+(+S.settings.urgency||0)/100:1));
   stgEnsure(svc,cl);const price=draft.remake?0:svc.billByStage?stgSum():(draft.priceTxt!==''?Math.max(0,+draft.priceTxt||0):base);
   return{svc,cl,isEl,n,base,price};
 }
@@ -2169,7 +2169,7 @@ function renderNewOrder(err=''){
   const opts=[...new Set(pool.map(x=>x.cat||'Outros'))].map(cat=>`<optgroup label="${esc(cat)}">${pool.filter(x=>(x.cat||'Outros')===cat).map(x=>`<option value="${x.id}" ${x.id===svc.id?'selected':''}>${esc(x.name)}</option>`).join('')}</optgroup>`).join('');
   const eo=draft.editId?S.orders.find(x=>x.id===draft.editId):null;
   openModal(mhead(eo?'Editar trabalho':'Novo trabalho','OS '+(eo?eo.num:S.seq))+`<form id="noForm" class="grid">
-  <div class="form-grid">${fld('no-cli','Cliente',sel('no-cli',S.clients.filter(c=>c.active!==false||c.id===draft.client).map(c=>[c.id,c.name+(c.discount?` (−${c.discount}%)`:'')]),draft.client,'data-d="client"'))}${fld('no-pac','Paciente (nome ou iniciais)',inp('no-pac',draft.patient,'text',`data-d="patient" placeholder="Ex.: M.A.S." ${S.settings.privIni!==false?'title="Por privacidade (LGPD) o sistema guarda só as iniciais"':''}`))}
+  <div class="form-grid">${fld('no-cli','Cliente',sel('no-cli',S.clients.filter(c=>c.active!==false||c.id===draft.client).map(c=>[c.id,c.name+(cliOwn(c)?' (tabela própria)':c.discount?` (−${c.discount}%)`:'')]),draft.client,'data-d="client"'))}${fld('no-pac','Paciente (nome ou iniciais)',inp('no-pac',draft.patient,'text',`data-d="patient" placeholder="Ex.: M.A.S." ${S.settings.privIni!==false?'title="Por privacidade (LGPD) o sistema guarda só as iniciais"':''}`))}
   ${fld('no-svc','Serviço',`<select id="no-svc" data-d="service" ${draft.lockSvc?'disabled title="O trabalho já avançou na produção"':''}>${opts}</select>`)}${fld('no-shade','Cor (escala VITA)',sel('no-shade',SHADES.map(x=>[x,x]),draft.shade,'data-d="shade"'))}${fld('no-due','Prazo de entrega',inp('no-due',draft.due,'date','data-d="due"'))}
   ${isEl?'':fld('no-qty',`Quantidade (${UNITL[svc.unit][1]})`,inp('no-qty',draft.qty,'number','min="1" step="1" data-d="qty"'))}
   ${fld('no-price',`Valor por ${ul} (R$)`,inp('no-price',svc.billByStage?'':draft.priceTxt,'number',`${can('preco')&&!svc.billByStage?'':'disabled '}min="0" step="0.01" data-d="priceTxt" placeholder="${svc.billByStage?'por etapa: '+stgSum().toFixed(2):svc.consult&&!svc.price?'Sob consulta: informe':base.toFixed(2)}"`))}${fld('no-disc','Desconto nesta OS (R$)',inp('no-disc',draft.discTxt||'','number',(can('preco')&&!svc.billByStage?'':'disabled ')+'min="0" step="0.01" data-d="discTxt" placeholder="0,00"'))}
@@ -2184,7 +2184,7 @@ function renderNewOrder(err=''){
   ${locked?'<p class="mut" style="font-size:12.5px;margin:6px 0 0">O trabalho já foi entregue: os itens adicionais não podem mais ser alterados.</p>':`<div class="toolbar" style="margin:8px 0 0">${sugg.slice(0,8).map(x=>`<button type="button" class="btn sm" data-act="nx-add" data-id="${x.id}">+ ${esc(x.name)}</button>`).join('')}<button type="button" class="btn sm ghost" data-act="nx-add">+ Outro serviço</button></div><p class="mut" style="font-size:12px;margin:6px 0 0">Componentes e serviços complementares (link, análogo, modelo, gengiva…) entram na mesma OS e na mesma fatura, e seguem o trabalho principal até a entrega.</p>`}</div>`})()}
 ${n&&!draft.remake?costBox(c,n):''}${draft.remake?'<p class="note" style="margin:0">Retrabalho: sem cobrança e com valores zerados (receita, custo, margem e comissão), para não interferir nos números da produção. O material continua saindo do estoque.</p>':''}
 ${n&&price>0&&c.st!=='OK'?`<p class="note" style="margin:0;background:${c.st==='META'?'var(--soon-soft)':'var(--late-soft)'};color:${c.st==='META'?'var(--soon)':'var(--late)'}"><b>Atenção:</b> a ${fmt(price)} por ${ul} a margem fica em ${pct(c.pct)}, ${c.st==='META'?'abaixo da meta de '+pct(+S.settings.margin):c.st==='CRIT'?'abaixo do mínimo de '+pct(+S.settings.marginMin):'com prejuízo'}. Preço mínimo ${fmt(c.minPrice)} · sugerido ${fmt(c.suggest)}.</p>`:''}
-<div class="sheet-foot"><div><span class="lbl">${n} ${un(svc,n)} × ${fmt(price)}${!draft.remake&&draft.priceTxt===''&&(cl.discount||draft.urgent)?` (tabela ${fmt(svc.price)}${cl.discount?`, desconto ${cl.discount}%`:''}${draft.urgent?`, urgência +${S.settings.urgency}%`:''})`:''}</span>${(draft.extras||[]).length?` <span class="lbl">+ itens ${fmt((draft.extras||[]).reduce((a,e)=>a+extraCalc(e,cl).tot,0))}</span>`:''}${+draft.discTxt>0?` <span class="lbl">− desconto ${fmt(Math.min(+draft.discTxt,n*price))}</span>`:''}<div class="total num">${fmt(Math.max(0,n*price-(draft.remake?0:Math.min(+draft.discTxt||0,n*price)))+(draft.extras||[]).reduce((a,e)=>a+extraCalc(e,cl).tot,0))}</div>${err?`<div class="err">${err}</div>`:''}</div>
+<div class="sheet-foot"><div><span class="lbl">${n} ${un(svc,n)} × ${fmt(price)}${!draft.remake&&draft.priceTxt===''&&(cliHas(svc,cl)||cl.discount||draft.urgent)?` (${cliHas(svc,cl)?`tabela do dentista ${fmt(cliPx(svc,cl))}`:`tabela ${fmt(svc.price)}${cl.discount?`, desconto ${cl.discount}%`:''}`}${draft.urgent?`, urgência +${S.settings.urgency}%`:''})`:''}</span>${(draft.extras||[]).length?` <span class="lbl">+ itens ${fmt((draft.extras||[]).reduce((a,e)=>a+extraCalc(e,cl).tot,0))}</span>`:''}${+draft.discTxt>0?` <span class="lbl">− desconto ${fmt(Math.min(+draft.discTxt,n*price))}</span>`:''}<div class="total num">${fmt(Math.max(0,n*price-(draft.remake?0:Math.min(+draft.discTxt||0,n*price)))+(draft.extras||[]).reduce((a,e)=>a+extraCalc(e,cl).tot,0))}</div>${err?`<div class="err">${err}</div>`:''}</div>
 <div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">Cancelar</button><button type="submit" class="btn primary">${eo?'Salvar alterações':'Criar trabalho'}</button></div></div></form>`);
 }
 
@@ -4058,6 +4058,67 @@ document.addEventListener('submit',e=>{const f=e.target;if(f.id!=='noForm'||!dra
   if(inv&&f&&!document.getElementById('inv-note')){const paid=recsOf(inv).some(isPaid);f.insertAdjacentHTML('afterbegin',`<p class="note" id="inv-note" style="margin:0">Esta OS já está na <b>fatura Nº ${pad4(inv.num)}</b>. Ao salvar, o total da fatura, as parcelas em aberto e a previsão de recebimento são recalculados${paid?'. As parcelas já pagas não mudam; se o valor subir e não houver parcela em aberto, a diferença vira uma parcela de complemento':''}.</p>`)}}}catch(er){}return r}}
 /* clicar em Salvar logo depois de digitar o valor: o formulário não se redesenha no meio do clique */
 document.addEventListener('pointerdown',e=>{if(e.target.closest&&e.target.closest('#noForm button[type=submit]'))window.__noSubAt=Date.now()},true);
+/* ================= Tabela de preços por dentista: cada cliente com o próprio preço de cada serviço ================= */
+// cl.prices = {idDoServiço: preço}. Serviço sem preço próprio usa o preço padrão do laboratório (menos o desconto geral do cliente, se houver).
+const cliHas=(svc,cl)=>!!(cl&&cl.prices&&svc&&cl.prices[svc.id]!=null&&cl.prices[svc.id]!=='');
+const cliPx=(svc,cl)=>{if(!svc)return 0;if(cliHas(svc,cl))return r2(+cl.prices[svc.id]||0);return r2((+svc.price||0)*(1-((cl&&+cl.discount)||0)/100))};
+// fator sobre os preços padrão (usado nas etapas cobradas separadamente, que acompanham o preço combinado)
+const cliK=(svc,cl)=>{if(cliHas(svc,cl)){const p=+svc.price||0;if(p>0)return(+cl.prices[svc.id]||0)/p;const sp=Object.values(svc.stagePrice||{}).reduce((a,x)=>a+(+x||0),0);return sp>0?(+cl.prices[svc.id]||0)/sp:1}return 1-((cl&&+cl.discount)||0)/100};
+const cliOwn=cl=>Object.keys((cl&&cl.prices)||{}).filter(k=>cl.prices[k]!==''&&cl.prices[k]!=null&&find('services',k)).length;
+// desconto médio da tabela do cliente frente à padrão (para relatórios de precificação)
+const cliDiscAvg=cl=>{const ss=actv('services').filter(s=>!s.consult&&+s.price>0);if(!ss.length)return+cl.discount||0;const a=ss.reduce((x,s)=>x+(1-cliPx(s,cl)/s.price),0)/ss.length;return Math.round(a*200)/2};
+const cliTabTxt=cl=>{const n=cliOwn(cl);return n?`Tabela própria · ${n} ${n>1?'serviços':'serviço'}${cl.discount?` · demais −${pct(cl.discount)}`:''}`:cl.discount?`Padrão −${pct(cl.discount)}`:'Tabela padrão'};
+let ptDraft=null;
+function ptOpen(cid,isNew){
+  const cl=cliOf(cid);if(!cl||!cl.id)return;const ed=can('preco');
+  ptDraft={cid,gen:+cl.discount||0,prices:{...(cl.prices||{})}};
+  const ss=actv('services').filter(s=>!s.consult).sort((a,b)=>String(a.cat||'').localeCompare(String(b.cat||''))||a.name.localeCompare(b.name));
+  const others=actv('clients').filter(c=>c.id!==cid&&cliOwn(c));
+  let cat=null;const rows=ss.map(s=>{const h=s.cat!==cat?(cat=s.cat,`<tr><td colspan="4" class="lbl" style="padding-top:12px">${esc(s.cat||'Sem categoria')}</td></tr>`):'';
+    const v=cliHas(s,cl)?cl.prices[s.id]:'';
+    return h+`<tr><td>${esc(s.name)} <span class="mut" style="font-size:12px">/ ${esc(s.unit||'unidade')}</span>${s.billByStage?'<div class="mut" style="font-size:11.5px">cobrado por etapa: as etapas acompanham este preço</div>':''}</td><td class="n mono">${fmt(+s.price||0)}</td>
+    <td class="n" style="width:140px"><input type="number" step="0.01" min="0" data-ptb="${s.id}" value="${v===''?'':esc(v)}" placeholder="${fmt(cliPx(s,{discount:ptDraft.gen}))}" ${ed?'':'disabled'} style="width:120px;text-align:right"></td><td class="n mono" data-ptbd="${s.id}" style="width:70px"></td></tr>`}).join('');
+  openModal(mhead('Tabela de preços',esc(cl.name)+(cl.clinic?' · '+esc(cl.clinic):''))+`<form id="ptbForm" class="grid">
+  <p class="mut" style="margin:0;font-size:13px">${isNew?'<b>Cliente cadastrado.</b> Agora defina o preço combinado com este dentista. ':''}Digite o valor acertado para cada serviço. Campo em branco usa o preço padrão do laboratório${ptDraft.gen?' com o desconto geral':''}. Trabalhos já lançados não mudam.</p>
+  ${ed?`<div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+    <div class="field" style="margin:0"><label for="ptb-gen">Desconto geral p/ serviços em branco (%)</label><input type="number" id="ptb-gen" min="0" max="90" step="0.5" value="${ptDraft.gen}" style="width:110px"></div>
+    <div class="field" style="margin:0"><label for="ptb-pct">Preencher todos com a padrão ± %</label><div style="display:flex;gap:6px"><input type="number" id="ptb-pct" step="0.5" placeholder="ex.: -10" style="width:90px"><button type="button" class="btn sm" data-act="ptb-fill">Preencher</button></div></div>
+    ${others.length?`<div class="field" style="margin:0"><label for="ptb-copy">Copiar tabela de outro dentista</label><div style="display:flex;gap:6px">${sel('ptb-copy',others.map(c=>[c.id,c.name]),'')}<button type="button" class="btn sm" data-act="ptb-copy">Copiar</button></div></div>`:''}
+    <button type="button" class="btn sm ghost" data-act="ptb-clear">Limpar (usar padrão)</button></div>`:'<p class="mut" style="font-size:12.5px;margin:0">Somente o dono ou o financeiro alteram preços.</p>'}
+  <div style="overflow-x:auto;max-height:52vh"><table><thead><tr><th>Serviço</th><th class="n">Padrão</th><th class="n">Deste dentista</th><th class="n">Dif.</th></tr></thead><tbody>${rows||'<tr><td class="empty" colspan="4">Nenhum serviço cadastrado.</td></tr>'}</tbody></table></div>
+  <div class="sheet-foot"><span class="mut" id="ptb-sum" style="font-size:12.5px"></span><div style="display:flex;gap:8px"><button type="button" class="btn" data-act="close">${ed?'Cancelar':'Fechar'}</button>${ed?'<button class="btn primary" type="submit">Salvar tabela</button>':''}</div></div></form>`);
+  ptPaint();
+}
+function ptPaint(){const f=document.getElementById('ptbForm');if(!f)return;const gen=+(document.getElementById('ptb-gen')||{}).value||0;let own=0;
+  f.querySelectorAll('[data-ptb]').forEach(i=>{const s=find('services',i.dataset.ptb),d=f.querySelector(`[data-ptbd="${i.dataset.ptb}"]`);const base=+s.price||0;
+    i.placeholder=fmt(r2(base*(1-gen/100)));const val=i.value===''?r2(base*(1-gen/100)):+i.value;if(i.value!=='')own++;
+    const df=base>0?Math.round((val/base-1)*1000)/10:0;if(d){d.textContent=df?(df>0?'+':'')+String(df).replace('.',',')+'%':'—';d.className='n mono '+(df<0?'neg':df>0?'pos':'mut')}});
+  const sm=document.getElementById('ptb-sum');if(sm)sm.textContent=own?`${own} ${own>1?'serviços':'serviço'} com preço próprio`:'Usando a tabela padrão'}
+document.addEventListener('input',e=>{if(e.target.closest&&e.target.closest('#ptbForm'))ptPaint()});
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-act]');if(!t)return;const a=t.dataset.act;
+  if(a==='ptb-open'){e.preventDefault();e.stopImmediatePropagation();ptOpen(t.dataset.id);return}
+  const f=document.getElementById('ptbForm');if(!f||!/^ptb-/.test(a))return;e.preventDefault();e.stopImmediatePropagation();if(!can('preco'))return;
+  const ins=[...f.querySelectorAll('[data-ptb]')];
+  if(a==='ptb-fill'){const raw=document.getElementById('ptb-pct').value;if(raw===''){toast('Digite o percentual (ex.: -10 para 10% abaixo da padrão)');return}const p=+raw||0;ins.forEach(i=>{const s=find('services',i.dataset.ptb);i.value=r2((+s.price||0)*(1+p/100))});}
+  if(a==='ptb-copy'){const o=cliOf(document.getElementById('ptb-copy').value);ins.forEach(i=>{const s=find('services',i.dataset.ptb);i.value=cliHas(s,o)?o.prices[s.id]:''});const g=document.getElementById('ptb-gen');if(g)g.value=+o.discount||0;toast('Tabela de '+o.name+' copiada. Confira e salve.')}
+  if(a==='ptb-clear'){ins.forEach(i=>i.value='');const g=document.getElementById('ptb-gen');if(g)g.value=0}
+  ptPaint()},true);
+document.addEventListener('submit',e=>{const f=e.target;if(f.id!=='ptbForm')return;e.preventDefault();e.stopImmediatePropagation();if(!can('preco')||!ptDraft)return;
+  const cl=cliOf(ptDraft.cid),prices={};f.querySelectorAll('[data-ptb]').forEach(i=>{if(i.value!=='')prices[i.dataset.ptb]=r2(Math.max(0,+i.value||0))});
+  // preços de serviços arquivados continuam guardados (não aparecem no editor)
+  Object.entries(cl.prices||{}).forEach(([k,v])=>{const s=find('services',k);if(s&&(s.active===false||s.consult)&&prices[k]==null)prices[k]=v});
+  const n0=cliOwn(cl);cl.prices=prices;cl.discount=Math.min(90,Math.max(0,+(document.getElementById('ptb-gen')||{}).value||0));
+  try{auditPush({act:'edit',kind:'clientes',label:cl.name,txt:`Tabela de preços atualizada (${Object.keys(prices).length} serviços com preço próprio; antes ${n0})`})}catch(_){}
+  save();closeModal();render();toast('Tabela de preços salva')},true);
+/* cadastro do cliente: o desconto sai do formulário e a tabela abre logo depois de criar o cliente */
+{const E=ENT.clients;if(Array.isArray(E.f))E.f=E.f.filter(r=>r[0]!=='discount');}
+{let before=null;document.addEventListener('submit',e=>{const f=e.target;if(f.id==='entForm'&&f.dataset.k==='clients'&&!f.dataset.id){before=new Set(S.clients.map(c=>c.id));
+  setTimeout(()=>{const nw=S.clients.find(c=>!before.has(c.id));before=null;if(nw&&can('preco'))ptOpen(nw.id,true)},0)}},true);}
+{const _ef=entForm;window.entForm=entForm=function(kind,id,...r){const x=_ef(kind,id,...r);if(kind==='clients'&&id){const ft=document.querySelector('#entForm .sheet-foot>div');if(ft)ft.insertAdjacentHTML('afterbegin',`<button type="button" class="btn" data-act="ptb-open" data-id="${id}">Tabela de preços</button>`)}return x}}
+{const _co=clientOpen;window.clientOpen=clientOpen=function(id,...r){const x=_co(id,...r);const c=cliOf(id),sh=document.getElementById('sheet');
+  const dl=sh&&[...sh.querySelectorAll('.dl .k')].find(k=>k.textContent==='Desconto');if(dl){dl.textContent='Tabela';dl.parentElement.lastChild.textContent=cliTabTxt(c)}
+  const ft=sh&&sh.querySelector('.sheet-foot>div');if(ft)ft.insertAdjacentHTML('afterbegin',`<button class="btn" data-act="ptb-open" data-id="${id}">Tabela de preços</button>`);return x}}
+
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
 {const h=decodeURIComponent((location.hash||'').slice(1));if(VIEWS.includes(h.split(':')[0]))goTarget(h)}
