@@ -942,7 +942,7 @@ function pinModal(u,isNew){openModal(mhead(isNew?'Login criado':'Novo PIN',esc(u
 <p class="mut" style="font-size:12.5px;margin:0">Nesta versão os dados ficam no navegador deste aparelho: o técnico entra por aqui (ex.: o computador da bancada). Para cada um usar o próprio celular, é preciso ativar a versão online.</p>
 <div class="sheet-foot"><button class="btn" data-act="pin-copy" data-id="${u.id}">Copiar instruções</button><button class="btn primary" data-act="close">Pronto</button></div></div>`,true)}
 const relOk=r=>can('fin')||r.g==='Produção'||(can('cli')&&r.g==='Clientes'&&!r.doc&&r.id!=='inad');
-function modsFor(){MODS=MODS_ALL.filter(modFeat).map(m=>({...m,items:m.items.filter(([t])=>canView(t.split(':')[0])&&!(t==='servicos:materiais'&&featOn('estoque')))})).filter(m=>m.items.length)}
+function modsFor(){MODS=MODS_ALL.filter(modFeat).map(m=>({...m,items:m.items.filter(([t])=>canView(t.split(':')[0]))})).filter(m=>m.items.length)}
 /* ================= Navegação por módulos ================= */
 const ICONS={home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
 tooth:'<path d="M7 3c-2.2 0-4 1.8-4 4.3 0 2.3.9 3.6 1.6 5.4.6 1.7.7 3.7 1.2 5.6.4 1.6 1 2.7 2 2.7 1.5 0 1.6-2.6 2.3-4.7.4-1.2 1-1.8 1.9-1.8s1.5.6 1.9 1.8c.7 2.1.8 4.7 2.3 4.7 1 0 1.6-1.1 2-2.7.5-1.9.6-3.9 1.2-5.6.7-1.8 1.6-3.1 1.6-5.4C21 4.8 19.2 3 17 3c-1.9 0-2.9 1.2-5 1.2S8.9 3 7 3z"/>',
@@ -961,7 +961,7 @@ const MODS_ALL=[
  {id:'clientes',n:'Clientes',ic:'users',d:'Dentistas, condições comerciais e mensagens.',items:[['clientes','Dentistas'],['mensagens','Mensagens']]},
  {id:'fin',n:'Financeiro',ic:'wallet',d:'Caixa, contas a receber e a pagar, fechamento e notas de serviço.',items:[['caixa','Fluxo de caixa'],['fechamento','Fechamento mensal'],['receber','Contas a receber'],['pagar','Contas a pagar'],['notas:saida','Notas fiscais (NFS-e)']]},
  {id:'estoque',n:'Estoque e compras',ic:'box',d:'Materiais, movimentações, notas de compra e fornecedores.',items:[['estoque:materiais','Materiais'],['estoque:comp','Links e análogos'],['estoque:dev','Devoluções de dentistas'],['estoque:movs','Movimentações'],['notas:entrada','Notas de compra (XML)'],['fornecedores','Fornecedores']]},
- {id:'precos',n:'Custos e preços',ic:'tag',d:'Fichas técnicas, custos e o preço certo de cada serviço.',items:[['servicos:servicos','Fichas e preços'],['servicos:maoobra','Mão de obra'],['servicos:equip','Equipamentos'],['servicos:fixos','Custos fixos'],['servicos:resultado','Resultado e equilíbrio'],['servicos:materiais','Materiais e custos'],['reforma','Reforma tributária']]},
+ {id:'precos',n:'Custos e preços',ic:'tag',d:'Fichas técnicas, custos e o preço certo de cada serviço.',items:[['servicos:servicos','Fichas e preços'],['servicos:maoobra','Mão de obra'],['servicos:equip','Equipamentos'],['servicos:fixos','Custos fixos'],['servicos:resultado','Resultado e equilíbrio'],['reforma','Reforma tributária']]},
  {id:'equipe',n:'Equipe',ic:'team',d:'Profissionais, etapas e comissões.',items:[['equipe','Profissionais'],['comissoes','Comissões']]},
  {id:'gestao',n:'Gestão',ic:'chart',d:'Resultado, rentabilidade e plano de contas.',items:[['resultado','Resultado (DRE)'],['cfo','CFO virtual'],['relatorios','Rentabilidade'],['contas','Plano de contas'],['audit','Auditoria']]},
  {id:'rel',n:'Relatórios',ic:'doc',d:'Todos os relatórios do sistema para imprimir, salvar em PDF ou Excel.',items:[['rel','Relatórios']]},
@@ -1027,8 +1027,6 @@ function onboarding(){
     ['servicos',S.services.length&&!S.services.some(x=>+x.price>0)?'Coloque o seu preço em cada serviço (as fichas técnicas já vêm prontas como modelo)':'Revise as fichas técnicas, preços e o status de margem de cada serviço',S.services.some(x=>+x.price>0)],
     ['clientes','Cadastre os dentistas e clínicas',S.clients.length>0],
     ['trabalhos','Crie o primeiro trabalho e leve-o até a entrega',S.orders.length>0]];
-  steps.forEach(x=>{if(x[0]==='estoque'&&!featOn('estoque')){x[0]='servicos:materiais';x[1]='Revise o custo dos materiais usados nas fichas'}if(x[0]==='equipe'&&!featOn('equipe')){x[0]='servicos:maoobra';x[1]='Cadastre a equipe e o custo de cada profissional'}});
-  for(let i=steps.length-1;i>=0;i--)if(!canView(steps[i][0].split(':')[0]))steps.splice(i,1);
   const done=steps.filter(x=>x[2]).length;
   return`<section class="panel" style="margin-bottom:18px"><h2>Primeiros passos · ${done} de ${steps.length}</h2><p class="sub" style="margin:-6px 0 12px">Siga esta ordem: os custos e materiais alimentam a composição de preço dos serviços, e os serviços e clientes são usados nos trabalhos.</p>
   <div class="alerts">${steps.map(([go,t,ok])=>`<button class="alert-i" data-act="go" data-v="${go}"><span class="tx"><span class="dot ${ok?'ok':'soon'}"></span><span${ok?' class="mut" style="text-decoration:line-through"':''}>${t}</span></span><span class="mut">›</span></button>`).join('')}</div></section>`;
@@ -1121,13 +1119,7 @@ function precFixNote(){const R=prec(),st=S.settings;return pctMode()?`${pct(R.fi
 function precFatTxt(){const f=prec().est._fat;return f.src==='os'?`média real dos últimos ${f.n} meses fechados (${fmt(f.v)})`:`valor de referência de ${fmt(f.v)}${f.n<3?' (ainda há menos de 3 meses fechados de OS)':''}`}
 V.servicos=()=>{
 let body='';const st=S.settings,R=prec();
-if(UI.svcTab==='materiais'){
-const list=listOf('materials').sort((a,b)=>(a.cat||'').localeCompare(b.cat||'')||a.name.localeCompare(b.name));
-body=`<p class="mut" style="font-size:12.5px;margin:0 0 10px">Custo de cada material usado nas fichas técnicas. O custo novo vale para as fichas na hora. Dica: material comprado em embalagem → clique em Editar e informe o preço da embalagem e quantos usos ela rende.</p>`+
-tbl(['Material','Categoria','Unidade','#Custo unit.',''],list.map(m=>`<tr><td style="min-width:200px"><b style="font-weight:500">${esc(m.name)}</b>${archChip(m)}${+m.pkgPrice>0?`<div class="mut" style="font-size:12px">${fmt(m.pkgPrice)} por ${esc(m.pkgUnit||'embalagem')} ÷ ${qty(m.yield)} usos</div>`:''}</td><td class="mut">${esc(m.cat||'')}</td><td class="mut">${esc(m.unit||'')}</td>
-<td class="n" style="width:120px"><input type="number" min="0" step="0.01" id="mc-${m.id}" value="${m.cost}" data-mat="${m.id}" data-f="cost" aria-label="Custo unitário" style="text-align:right"></td>
-<td class="n"><button class="btn sm ghost" data-act="ent-form" data-k="materials" data-id="${m.id}">Editar</button></td></tr>`),'Nenhum material cadastrado. Clique em + Material.');
-}else if(UI.svcTab==='servicos'){
+if(UI.svcTab==='servicos'){
 const cats=[...new Set(S.services.map(x=>x.cat).filter(Boolean))];
 const vol=precVolumes();
 const cs=listOf('services').filter(s=>!UI.svcCat||s.cat===UI.svcCat).map(s=>[s,costing(s)]);
@@ -1177,7 +1169,7 @@ body=`<p class="note">Faturamento usado no rateio: ${precFatTxt()}. Volumes: mé
 <div class="two"><section class="panel"><h2>Uso da equipe por função</h2>${tbl(['Função','#Demanda (h)','#Capacidade (h)','#Uso'],mx.porFn.map(x=>`<tr><td>${esc(x.n)}</td><td class="n">${qty(x.dem/60)}</td><td class="n">${qty(x.cap/60)}</td><td class="n ${x.uso>1?'neg':''}">${x.uso==null?'terceirizado':pct(x.uso*100)}</td></tr>`),'Sem volume de OS.')}</section>
 <section class="panel"><h2>Mix de serviços</h2>${tbl(['Serviço','#Qtd/mês','#Preço médio','#Faturamento','#Contribuição','#Margem'],mj.map(([id,x])=>`<tr class="click" data-act="svc-open" data-id="${id}"><td>${esc(find('services',id)?.name||'—')}</td><td class="n">${qty(x.q)}</td><td class="n">${fmt(x.pm)}</td><td class="n">${fmt(x.fat)}</td><td class="n">${fmt(x.mcTot)}</td><td class="n ${x.margem<0?'neg':''}">${pct(x.margem*100)}</td></tr>`),'Sem OS nos últimos 3 meses.')}</section></div>`;
 }
-return head('Serviços e custos','Precificação integrada: fichas técnicas, equipe, máquinas, custos fixos e resultado, calculados com os dados reais do laboratório.',UI.svcTab==='servicos'?archBtn('services')+'<button class="btn primary" data-act="svc-open">+ Novo serviço</button>':UI.svcTab==='materiais'?archBtn('materials')+'<button class="btn primary" data-act="ent-form" data-k="materials">+ Material</button>':UI.svcTab==='maoobra'&&!featOn('equipe')?'<button class="btn primary" data-act="ent-form" data-k="team">+ Novo profissional</button>':'')+
+return head('Serviços e custos','Precificação integrada: fichas técnicas, equipe, máquinas, custos fixos e resultado, calculados com os dados reais do laboratório.',UI.svcTab==='servicos'?archBtn('services')+'<button class="btn primary" data-act="svc-open">+ Novo serviço</button>':'')+
 `<div class="toolbar">${seg('svcTab',[['servicos','Fichas e preços'],['maoobra','Equipe e mão de obra'],['equip','Equipamentos'],['fixos','Custos fixos'],['resultado','Resultado e equilíbrio']])}</div>`+body;
 };
 V.estoque=()=>{
@@ -1215,17 +1207,6 @@ V.equipe=()=>{const k=monthKey(0),ce=commEntries(k);
   tbl(['Nome','Função','Tipo','Etapas','#Custo mensal','#Unidades no mês','#Produção no mês',...(can('admin')?['Acesso ao sistema']:[])],listOf('team').map(t=>{const e=ce.filter(x=>x.tech===t.id),pi=prec().teamIdx[t.id],px=pi!=null?prec().staff[pi]:null;return`<tr class="click" data-act="ent-form" data-k="team" data-id="${t.id}"><td>${esc(t.name)}${archChip(t)}</td><td>${esc(t.role)}</td><td>${t.type==='terceiro'?'Terceirizado':'Interno'}</td><td><div class="chips">${t.stages.map(s=>`<span class="chip">${SN[s]}</span>`).join('')||'<span class="mut">—</span>'}</div></td><td class="n">${px?fmt(px.total):'<span class="mut">—</span>'}</td><td class="n">${e.reduce((a,x)=>a+x.elements,0)}</td><td class="n">${fmt(e.reduce((a,x)=>a+x.elements*x.rate,0))}</td>${can('admin')?`<td style="white-space:nowrap">${teamLoginCell(t)}</td>`:''}</tr>`}),'Ninguém cadastrado. Cadastre a equipe e marque as etapas de cada profissional para usar na Produção.');
 };
 
-/* laboratório só com Custos e preços (plano Precifica): painel focado em precificação */
-const _painelFull=V.painel;
-V.painel=()=>{if(featOn('fin')||!featOn('precos'))return _painelFull();
-  const st=S.settings,cs=actv('services').map(s=>[s,costing(s)]),priced=cs.filter(([s])=>+s.price>0);
-  const cnt=k=>priced.filter(([s,c])=>c.st===k).length,noPrice=cs.length-priced.length;
-  const worst=priced.filter(([s,c])=>c.st==='LOSS'||c.st==='CRIT').sort((a,b)=>a[1].pct-b[1].pct).slice(0,8);
-  return head('Painel de precificação','Como estão os preços do laboratório frente aos custos reais.','<button class="btn primary" data-act="svc-open">+ Novo serviço</button>')+
-  `<div class="toolbar"><span class="lbl">Atalhos</span><button class="btn sm" data-act="go" data-v="servicos:servicos">Fichas e preços</button><button class="btn sm" data-act="go" data-v="servicos:fixos">Custos fixos</button><button class="btn sm" data-act="go" data-v="servicos:materiais">Materiais e custos</button><button class="btn sm" data-act="go" data-v="servicos:maoobra">Mão de obra</button><button class="btn sm" data-act="go" data-v="servicos:resultado">Resultado e equilíbrio</button></div>`+
-  onboarding()+
-  `<div class="kpis">${kpi('Serviços com preço',priced.length,noPrice?noPrice+' sem preço':'todos com preço')}${kpi('Na meta',cnt('OK'),'margem ≥ '+pct(+st.margin),'good')}${kpi('Abaixo da meta',cnt('META'),'ainda dá lucro')}${kpi('Críticos ou no prejuízo',cnt('CRIT')+cnt('LOSS'),'reveja primeiro',cnt('CRIT')+cnt('LOSS')?'alert':'')}</div>`+
-  (worst.length?`<section class="panel"><h2>Revise primeiro</h2>${tbl(['Serviço','#Preço atual','#Preço mínimo','#Preço sugerido','#Margem'],worst.map(([s,c])=>`<tr class="click" data-act="svc-open" data-id="${s.id}"><td>${esc(s.name)}</td><td class="n">${fmt(s.price)}</td><td class="n">${isFinite(c.minPrice)?fmt(c.minPrice):'—'}</td><td class="n">${isFinite(c.suggest)?fmt(c.suggest):'—'}</td><td class="n ${c.pct<0?'neg':''}">${pct(c.pct)}</td></tr>`),'')}</section>`:'')};
 V.receber=()=>{
   const k=monthKey(0),open=S.receivables.filter(r=>!isPaid(r)),late=open.filter(r=>daysTo(r.due)<0),ub=unbilled();
   const sum=a=>a.reduce((x,r)=>x+r.amount,0);
@@ -4344,6 +4325,18 @@ document.addEventListener('submit',e=>{const f=e.target;if(!['cpForm','cpUseForm
 {const _co=clientOpen;window.clientOpen=clientOpen=function(id,...a){const x=_co(id,...a);const sh=document.getElementById('sheet'),ft=sh&&sh.querySelector('.sheet-foot>div');
   if(ft)ft.insertAdjacentHTML('beforeend',`<button class="btn" data-cp-ret="${id}">Devolução de componentes</button>`);
   const p=cpPending(id);if(p.length&&sh){const cb=sh.querySelector('.costbox');if(cb)cb.insertAdjacentHTML('afterend',`<p class="mut" style="font-size:12.5px;margin:6px 0 0">Crédito de devolução a abater na próxima fatura: <b>${fmt(p.reduce((a,r)=>a+r.credit,0))}</b></p>`)}return x}}
+
+/* ================= Clientes: painel de novos, ativos e inativos (+60 dias) ================= */
+function cliStats(){const t0=addDays(0),m=t0.slice(0,7),lim=addDays(-60),first={},last={};
+  S.orders.forEach(o=>{if(o.parent||o.status==='cancelado'||!o.created)return;const c=o.client;if(!first[c]||o.created<first[c])first[c]=o.created;if(!last[c]||o.created>last[c])last[c]=o.created});
+  const cls=actv('clients'),novos=cls.filter(c=>first[c.id]&&first[c.id].slice(0,7)===m),ativos=cls.filter(c=>last[c.id]&&last[c.id]>=lim),
+    inat=cls.filter(c=>last[c.id]&&last[c.id]<lim).sort((a,b)=>last[a.id].localeCompare(last[b.id])),nunca=cls.filter(c=>!last[c.id]);
+  return{novos,ativos,inat,nunca,last,first}}
+{const _vc=V.clientes;V.clientes=(...a)=>{let h=_vc(...a);const s=cliStats(),days=id=>-daysTo(s.last[id]);
+  const box=`<div class="kpis">${kpi('Novos no mês',s.novos.length,s.novos.map(c=>c.name).slice(0,2).join(', ')||'primeiro pedido neste mês')}${kpi('Ativos (60 dias)',s.ativos.length,'pediram nos últimos 60 dias')}${kpi('Inativos +60 dias',s.inat.length,s.inat.length?'veja a lista abaixo':'nenhum parado',s.inat.length?'alert':'')}${kpi('Sem pedidos',s.nunca.length,'cadastrados que nunca pediram')}</div>`+
+   (s.inat.length?`<details class="panel" style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:600">Dentistas sem pedir há mais de 60 dias (${s.inat.length})</summary><div style="overflow-x:auto;margin-top:8px"><table><tbody>${s.inat.slice(0,30).map(c=>`<tr class="click" data-act="cli-open" data-id="${c.id}"><td>${esc(c.name)}</td><td class="mut">${esc(c.clinic||'')}</td><td class="n">última OS em ${dmy(s.last[c.id])}</td><td class="n"><span class="pill late">${days(c.id)} dias</span></td></tr>`).join('')}</tbody></table></div></details>`:'');
+  const k=h.indexOf('<div class="tbl-wrap"');
+  return k>0?h.slice(0,k)+box+h.slice(k):h+box}}
 
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
