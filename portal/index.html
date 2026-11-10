@@ -45,11 +45,13 @@ h2{font:700 18px 'Sora',system-ui,sans-serif;margin:4px 0 0}
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),dm=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'—',dmy=d=>d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'—';
 const today=()=>new Date(Date.now()-3*36e5).toISOString().slice(0,10);
-const TOK=(location.hash.match(/t=([A-Za-z0-9_-]+)/)||[])[1]||'';
+const INV=(location.hash.match(/[#&]t=([A-Za-z0-9_-]+)/)||[])[1]||'',RST=(location.hash.match(/[#&]r=([A-Za-z0-9_-]+)/)||[])[1]||'';
+const SK='cerione-portal-sessao';let TOK='';try{TOK=localStorage.getItem(SK)||''}catch(e){}
+const setTok=t=>{TOK=t||'';try{t?localStorage.setItem(SK,t):localStorage.removeItem(SK)}catch(e){}};
 const CFG=window.CERIONE_CFG||{},SB=window.supabase&&CFG.url?window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}}):null;
-async function api(action,body){if(!SB)throw new Error('offline');const{data,error}=await SB.functions.invoke('portal',{body:{action,token:TOK,...(body||{})}});
+async function api(action,body){if(!SB)throw new Error('offline');const{data,error}=await SB.functions.invoke('portal',{body:{action,token:TOK,base:location.origin+'/portal/',...(body||{})}});
   if(error){let j={};try{j=await error.context.json()}catch(e){}throw new Error(j.error||'server_error')}return data}
-const ERR={invalid_link:'Este link não está ativo. Peça um novo link ao laboratório.',rate_limited:'Muitos envios hoje por este link. Tente amanhã ou fale com o laboratório.',file_type:'Tipo de arquivo não aceito. Envie fotos, PDF, STL, PLY, OBJ ou ZIP.',file_size:'Arquivo maior que 25 MB.',invalid_fields:'Preencha paciente e serviço.',offline:'Sem conexão com o servidor.',server_error:'Não foi possível concluir agora. Tente de novo em instantes.'};
+const ERR={invalid_link:'Sua sessão terminou. Entre de novo com seu e-mail e senha.',bad_login:'E-mail ou senha incorretos.',locked:'Muitas tentativas erradas. Aguarde 15 minutos ou use “Esqueci minha senha”.',weak_password:'A senha precisa ter pelo menos 8 caracteres, com letras e números.',bad_email:'Confira o e-mail.',already_set:'Este convite já foi usado. Entre com seu e-mail e senha.',invalid_reset:'Este link de troca de senha expirou ou já foi usado. Peça outro.',rate_limited:'Muitos envios hoje por este link. Tente amanhã ou fale com o laboratório.',file_type:'Tipo de arquivo não aceito. Envie fotos, PDF, STL, PLY, OBJ ou ZIP.',file_size:'Arquivo maior que 25 MB.',invalid_fields:'Preencha paciente e serviço.',offline:'Sem conexão com o servidor.',server_error:'Não foi possível concluir agora. Tente de novo em instantes.'};
 const errTxt=e=>ERR[e&&e.message]||ERR.server_error;
 let D=null,tab='os',flt='and',q='',open=new Set(),F=null;
 const UP=[18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28],LO=[48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
@@ -117,7 +119,35 @@ document.addEventListener('submit',async e=>{if(e.target.id!=='nf')return;e.prev
       const u=await api('upload',{name:f.name,size:f.size});const{error}=await SB.storage.from('portal').uploadToSignedUrl(u.path,u.token,f,{contentType:f.type||'application/octet-stream'});if(error)throw new Error('server_error');up.push({path:u.path,name:f.name,size:f.size})}
     go.textContent='Enviando pedido…';await api('request',{data:{patient:F.patient,service:F.service,teeth:F.teeth,qty:F.qty,shade:F.shade,due:F.due,urgent:F.urgent,impression:F.impression,pickup:F.pickup,notes:F.notes,remake_of:F.remake_of},files:up});
     F={sent:true};await load(true)}catch(err){er.textContent=errTxt(err);go.disabled=false;go.textContent='Enviar pedido'}});
-async function load(keepTab){try{const d=await api('view');D=d;head();if(!keepTab)tab='os';draw()}catch(e){$('h-lab').textContent='Portal do dentista';$('tabs').hidden=true;$('app').innerHTML=`<div class="card empty">${esc(TOK?errTxt(e):'Abra o link que o laboratório enviou para você.')}</div>`}}
-if(!TOK){$('h-lab').textContent='Portal do dentista';$('app').innerHTML='<div class="card empty">Abra o link que o laboratório enviou para você.</div>'}else{load();setInterval(()=>{if(document.visibilityState==='visible'&&tab!=='novo')load(true)},120000)}
+async function load(keepTab){try{const d=await api('view');D=d;head();$('h-act').insertAdjacentHTML('beforeend',' <button class="btn" id="lo-out">Sair</button>');$('lo-out').onclick=async()=>{try{await api('logout')}catch(e){}setTok('');loginView()};if(!keepTab)tab='os';draw()}
+  catch(e){if(e&&e.message==='invalid_link'){setTok('');loginView('Sua sessão terminou. Entre de novo.')}else{$('tabs').hidden=true;$('app').innerHTML=`<div class="card empty">${esc(errTxt(e))}</div>`}}}
+const AUTHCSS='<style>.au{max-width:420px;margin:24px auto;display:grid;gap:12px}.au input{width:100%;height:auto;min-height:44px}.au .f{display:grid;gap:6px}.au .msg{font-size:13.5px;padding:10px 12px;border-radius:10px;background:#FDECEC;color:#B42318}.au .msg.ok{background:#E7F7F5;color:#0B7A75}.au .lk{background:none;border:0;color:var(--mut);text-decoration:underline;cursor:pointer;font:500 13.5px Manrope,system-ui,sans-serif;justify-self:start;padding:0}.au .pick{display:grid;gap:8px}</style>';
+function shell(title,sub){$('h-lab').textContent=title;$('h-sub').textContent=sub||'';$('h-act').innerHTML='';$('tabs').hidden=true}
+function authForm(html,onSubmit){$('app').innerHTML=AUTHCSS+`<form class="card au" id="au">${html}<div class="msg" id="au-m" hidden></div></form>`;const f=$('au'),m=$('au-m');
+  f.onsubmit=async e=>{e.preventDefault();const bt=f.querySelector('button[type=submit]');bt.disabled=true;m.hidden=true;try{await onSubmit(f)}catch(er){m.className='msg';m.textContent=errTxt(er);m.hidden=false}bt.disabled=false};
+  setTimeout(()=>{const i=f.querySelector('input');i&&i.focus()},30)}
+const pwField=(id,l)=>`<div class="f"><label for="${id}">${l}</label><input id="${id}" type="password" autocomplete="new-password" minlength="8" required></div><p style="margin:-4px 0 0;font-size:12.5px;color:var(--mut)">Mínimo 8 caracteres, com letras e números.</p>`;
+function enter(r){if(r.labs&&r.labs.length>1){shell('Portal do dentista','Escolha o laboratório');$('app').innerHTML=AUTHCSS+`<div class="card au"><b>Você tem acesso a mais de um laboratório</b><div class="pick">${r.labs.map((x,i)=>`<button class="btn" data-i="${i}">${esc(x.lab)}</button>`).join('')}</div></div>`;
+  $('app').querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{setTok(r.labs[+b.dataset.i].session);start()});return}
+  setTok(r.session||r.labs[0].session);start()}
+function loginView(note){shell('Portal do dentista','Acompanhe seus trabalhos e envie pedidos');
+  authForm(`<b style="font-size:17px">Entrar</b>${note?`<div class="msg ok">${esc(note)}</div>`:''}<div class="f"><label for="au-e">E-mail</label><input id="au-e" type="email" autocomplete="username" required></div><div class="f"><label for="au-p">Senha</label><input id="au-p" type="password" autocomplete="current-password" required></div><button class="btn p" type="submit">Entrar</button><button type="button" class="lk" id="au-fg">Esqueci minha senha</button><p style="margin:0;font-size:12.5px;color:var(--mut)">Primeiro acesso? Abra o convite que o laboratório enviou para você.</p>`,
+   async f=>{const r=await api('login',{email:$('au-e').value,password:$('au-p').value});enter(r)});
+  $('au-fg').onclick=()=>forgotView($('au-e').value)}
+function forgotView(e){shell('Portal do dentista','Trocar a senha');
+  authForm(`<b style="font-size:17px">Esqueci minha senha</b><div class="f"><label for="au-e">E-mail do seu acesso</label><input id="au-e" type="email" value="${esc(e||'')}" required></div><button class="btn p" type="submit">Enviar link por e-mail</button><button type="button" class="lk" id="au-bk">Voltar</button>`,
+   async f=>{await api('forgot',{email:$('au-e').value});const m=$('au-m');m.className='msg ok';m.textContent='Se este e-mail tiver acesso, você vai receber um link para criar uma nova senha. Ele vale por 1 hora.';m.hidden=false});
+  $('au-bk').onclick=()=>loginView()}
+async function inviteView(){shell('Portal do dentista','');let info;
+  try{info=await api('invite_info',{token:INV})}catch(e){history.replaceState(null,'',location.pathname);loginView(e.message==='invalid_link'?'Este convite não está mais ativo. Entre com seu e-mail e senha ou peça um novo convite ao laboratório.':errTxt(e));return}
+  shell(info.lab,info.dentist);if(info.has_access){history.replaceState(null,'',location.pathname);loginView('Você já criou seu acesso. Entre com seu e-mail e senha.');return}
+  authForm(`<b style="font-size:17px">Crie seu acesso ao portal</b><p style="margin:0;font-size:13.5px;color:var(--mut)">Você vai usar este e-mail e senha para entrar sempre que quiser acompanhar seus trabalhos no ${esc(info.lab)}.</p><div class="f"><label for="au-e">E-mail</label><input id="au-e" type="email" autocomplete="username" value="${esc(info.email||'')}" required></div>${pwField('au-p','Crie uma senha')}<div class="f"><label for="au-p2">Repita a senha</label><input id="au-p2" type="password" autocomplete="new-password" required></div><button class="btn p" type="submit">Criar acesso e entrar</button>`,
+   async f=>{if($('au-p').value!==$('au-p2').value)throw new Error('pw_diff');const r=await api('setup',{token:INV,email:$('au-e').value,password:$('au-p').value});history.replaceState(null,'',location.pathname);enter(r)})}
+function resetView(){shell('Portal do dentista','Nova senha');
+  authForm(`<b style="font-size:17px">Crie uma nova senha</b>${pwField('au-p','Nova senha')}<div class="f"><label for="au-p2">Repita a senha</label><input id="au-p2" type="password" autocomplete="new-password" required></div><button class="btn p" type="submit">Salvar e entrar</button>`,
+   async f=>{if($('au-p').value!==$('au-p2').value)throw new Error('pw_diff');const r=await api('reset',{rtoken:RST,password:$('au-p').value});history.replaceState(null,'',location.pathname);enter(r)})}
+ERR.pw_diff='As duas senhas não são iguais.';
+let tick=null;function start(){load();if(!tick)tick=setInterval(()=>{if(TOK&&document.visibilityState==='visible'&&tab!=='novo')load(true)},120000)}
+if(INV)inviteView();else if(RST)resetView();else if(TOK)start();else loginView();
 })();
 </script></body></html>
