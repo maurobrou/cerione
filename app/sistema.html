@@ -3379,7 +3379,7 @@ V.cfo=()=>{const s=cfoSnap(),m=s.resultado_mensal,prev=m[4]||{},cur=m[5]||{},rul
 .cfo-err{margin-top:12px;background:var(--late-soft);color:var(--late);border-radius:10px;padding:10px 12px;font-size:13px}.cfo-hist{margin-top:14px}.cfo-hist summary{cursor:pointer;font-weight:600;padding:6px 0}.cfo-hist details{margin:6px 0 0 10px}`;document.head.appendChild(css)})();
 document.addEventListener('input',e=>{if(e.target.id==='cfo-q')CFO.q=e.target.value});
 document.addEventListener('click',async e=>{if(e.target.id!=='cfo-go'||CFO.busy)return;if(!can('fin')){toast('Só Dono e Financeiro usam o CFO virtual');return}
-  if(!CFO_API.online){CFO.err='A análise por IA funciona na versão online do CERIONE (cerione.vercel.app). Aqui você vê o diagnóstico automático acima.';render();return}
+  if(!CFO_API.online){CFO.err='A análise por IA funciona na versão online do CERIONE (cerioneapp.com.br). Aqui você vê o diagnóstico automático acima.';render();return}
   CFO.busy=true;CFO.err='';render();
   try{const q0=CFO.q.trim(),text=await CFO_API.analyze(cfoSnap(),q0);const u=curUser()||{};S.cfoHist=[{at:new Date().toISOString(),by:u.name||'',q:q0,text},...(S.cfoHist||[])].slice(0,12);CFO.q='';save()}
   catch(err){const m=String(err&&err.message||err);CFO.err=/not_contracted/.test(m)?'O CFO virtual não está no plano do seu laboratório. Fale com o CERIONE para contratar.':/limit_ai/.test(m)?'Limite diário de análises atingido. Tente de novo amanhã.':/no_key|ANTHROPIC/.test(m)?'O CFO ainda não foi ativado no servidor (falta a chave da IA). Fale com o CERIONE.':/forbidden/.test(m)?'Só Dono e Financeiro podem pedir análises.':'Não foi possível concluir a análise agora. Tente de novo em instantes.'}
@@ -3751,7 +3751,7 @@ const popDentDef=k=>(window.POP_DENT&&POP_DENT[k]?POP_DENT[k].items:POP_DEF[k].d
 const popDent=k=>{const o=((S.settings.pops||{})[k]||{}).dent,def=popDentDef(k);if(!o)return def;
   return o.map((ln,i)=>{const j=ln.indexOf(':'),t=(j>0?ln.slice(0,j):ln).trim(),x=j>0?ln.slice(j+1).trim():'',m=def.find(d=>d.t.toLowerCase()===t.toLowerCase())||null;return{t,x,il:m?m.il:(def[i]&&!o.some(z=>z.toLowerCase().startsWith(def[i].t.toLowerCase()))?null:null)}})};
 const popGet=k=>{const d=POP_DEF[k],o=(S.settings.pops||{})[k]||{};return{...d,intro:(window.POP_DENT&&POP_DENT[k]||{}).intro||d.d,dentI:popDent(k),dent:popDent(k).map(i=>i.x?i.t+': '+i.x:i.t),banc:{...d.banc,...(o.banc||{})}}};
-const popGuia=k=>{const base=/^https?:/.test(location.origin)&&window.CERIONE_APPURL?location.origin:'https://cerione.vercel.app';return`${base}/guia/?t=${k}${S.settings.lab?'&lab='+encodeURIComponent(S.settings.lab):''}`};
+const popGuia=k=>{const base=/^https?:/.test(location.origin)&&window.CERIONE_APPURL?location.origin:'https://cerioneapp.com.br';return`${base}/guia/?t=${k}${S.settings.lab?'&lab='+encodeURIComponent(S.settings.lab):''}`};
 function popType(svc){if(!svc)return null;if(svc.pop)return svc.pop==='none'?null:svc.pop;const n=(svc.name||'')+' '+(svc.cat||'');
   if(/lente|laminad|faceta/i.test(n))return'lente';if(/protocolo/i.test(n))return'protocolo';if(/^PT\b|prótese total/i.test(svc.name||''))return'pt';
   if(/implant|munh|barra|link|ti-base|análogo|parafus/i.test(n))return'psi';if(/coroa|zirc|e-?max|inlay|onlay|pmma|elemento|metalocer/i.test(n))return'coroa';return null}

@@ -21,7 +21,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 echo "-> Liberando as portas 80 e 443 no firewall da VM..."
 for p in 80 443; do
-  sudo iptables -C INPUT -p tcp --dport $p -m state --state NEW -j ACCEPT 2>/dev/null || sudo iptables -I INPUT 5 -p tcp --dport $p -m state --state NEW -j ACCEPT
+  sudo iptables -C INPUT -p tcp --dport $p -m state --state NEW -j ACCEPT 2>/dev/null || sudo iptables -I INPUT -p tcp --dport $p -m state --state NEW -j ACCEPT
 done
 if command -v netfilter-persistent >/dev/null 2>&1; then sudo netfilter-persistent save >/dev/null 2>&1 || true
 else sudo DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent >/dev/null 2>&1 && sudo netfilter-persistent save >/dev/null 2>&1 || true; fi

@@ -1,7 +1,7 @@
 CERIONE · servidor de WhatsApp (Evolution API)
 
 1. Na VM (Google Cloud, Oracle ou VPS com Ubuntu), cole este comando único:
-   mkdir -p ~/cerione-whatsapp && cd ~/cerione-whatsapp && for f in instalar.sh docker-compose.yml Caddyfile LEIA-ME.txt; do curl -fsSLO https://cerione.vercel.app/servidor/$f; done && bash instalar.sh
+   mkdir -p ~/cerione-whatsapp && cd ~/cerione-whatsapp && for f in instalar.sh docker-compose.yml Caddyfile LEIA-ME.txt; do curl -fsSLO https://cerioneapp.com.br/servidor/$f; done && bash instalar.sh
 2. (ele instala o Docker, cria memória extra se a máquina for pequena e sobe tudo com HTTPS)
 3. Copie EVOLUTION_URL e EVOLUTION_KEY que aparecem no final para os
    segredos do Supabase (Edge Functions -> Secrets).

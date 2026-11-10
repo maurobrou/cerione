@@ -222,12 +222,12 @@ async function loadAudit(){const{data}=await C.sb.from('audit_log').select('at,e
 function setStatus(s){C.status=s;const el=$('cl-st');if(!el)return;const t={ok:'Salvo no servidor'+(C.lastOk?' · '+C.lastOk.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''),saving:'Salvando…',err:'Sem conexão · tentando de novo',conflict:'Atualizado por outra pessoa',ro:'Somente leitura',idle:'Conectado'}[s]||'';el.className='st '+({ok:'ok',saving:'saving',err:'err',conflict:'err',ro:'err'}[s]||'');el.textContent=t}
 function schedule(ms=1200){clearTimeout(C.timer);C.timer=setTimeout(()=>push(),ms)}
 async function push(force){if(!C.lab||!S)return;if(C.inflight){C.again=true;return}C.inflight=true;
-  try{const parts=split();let any=false;
+  try{const parts=split();let any=false,conf=false;
     for(const a of Object.keys(AREAS)){const j=J(parts[a]);if(!force&&j===C.sent[a])continue;if(!canW(a)){C.sent[a]=j;continue}any=true;setStatus('saving');
       const{data,error}=await C.sb.rpc('save_doc',{p_lab:C.lab.id,p_area:a,p_data:parts[a],p_expected:C.ver[a]??null});if(error)throw error;const r=Array.isArray(data)?data[0]:data;
-      if(r&&r.ok){C.ver[a]=r.version;C.sent[a]=j}else{await conflict(a);break}}
+      if(r&&r.ok){C.ver[a]=r.version;C.sent[a]=j}else{await conflict(a);conf=true;break}}
     const pend=(S.audit||[]).slice(C.auditSent).filter(e=>!String(e.id||'').startsWith('srv'));if(pend.length){const{error}=await C.sb.rpc('append_audit',{p_lab:C.lab.id,p_entries:pend.slice(0,500)});if(!error)C.auditSent=S.audit.length}
-    if(any||force){C.lastOk=new Date();setStatus(C.st&&!C.st.can_write?'ro':'ok')}}
+    if((any||force)&&!conf){C.lastOk=new Date();setStatus(C.st&&!C.st.can_write?'ro':'ok')}}
   catch(e){console.error(e);setStatus('err');C.inflight=false;schedule(10000);return}
   C.inflight=false;if(C.again){C.again=false;schedule(300)}}
 async function conflict(a){const{data}=await C.sb.from('lab_docs').select('data,version').eq('lab_id',C.lab.id).eq('area',a).single();if(!data)return;
