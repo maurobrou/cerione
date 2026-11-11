@@ -419,7 +419,7 @@ C.boot=function(){if(!window.supabase||!CFG.url){screen('<div class="msg err">Co
     async cfg(){const{data,error}=await C.sb.rpc('wa_get',{p_lab:C.lab.id});if(error)throw error;return data||{status:'desconectado'}},
     status:()=>waCall('status'),connect:()=>waCall('connect'),logout:()=>waCall('logout'),hook:()=>waCall('hook'),
     async aiMonth(){const{data,error}=await C.sb.rpc('wa_ai_month',{p_lab:C.lab.id});if(error)throw error;return +data||0},
-    send:m=>waCall('send',m),
+    send:m=>waCall('send',m),sendDoc:m=>waCall('send_doc',m),
     async setAuto(auto){const{error}=await C.sb.rpc('wa_set_auto',{p_lab:C.lab.id,p_auto:auto});if(error)throw error},
     async log(){const{data,error}=await C.sb.rpc('wa_log_list',{p_lab:C.lab.id});if(error)throw error;return data||[]}};
   C.sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
