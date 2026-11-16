@@ -9,7 +9,7 @@ const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const LAST='cerione-last-lab';
 /* ---------- áreas: quais dados ficam em cada documento e quem grava ---------- */
 const AREAS={producao:['orders','seq','services','team','stgV','lateAck'],clientes:['clients'],mensagens:['msgs'],
-  financeiro:['cfoHist','receivables','invoices','invSeq','payables','posted','accounts','cashMoves','bankLines','bankImports','nfse','chart'],
+  financeiro:['cfoHist','receivables','invoices','invSeq','payables','posted','accounts','cashMoves','bankLines','bankImports','nfse','chart','commAdj'],
   estoque:['materials','moves','suppliers','nfeIn','nfeMap','compRets','retSeq','compBrands'],custos:['fixed','equipment','precImport','fichasV','precV','teamCost'],config:['settings','memberTeam','demoAutoV','_rcDismiss']};
 const LOCAL=new Set(['users','audit','_imported','chat']);
 const WRITE={dono:Object.keys(AREAS),fin:['producao','clientes','mensagens','financeiro','estoque'],rec:['producao','clientes','mensagens','estoque'],tec:['producao','mensagens']};
