@@ -1111,7 +1111,7 @@ V.producao=()=>{
   const act=S.orders.filter(o=>o.status==='producao'&&mine(o)&&(!UI.prodTech||defaultTech(o,curStage(o))===UI.prodTech));
   const recent=S.orders.filter(o=>!o.parent&&o.status==='entregue'&&mine(o)&&daysTo(o.delivered)>=-5).sort((a,b)=>b.delivered.localeCompare(a.delivered));
   const card=o=>{const st=curStage(o);return`<article class="card ${isLate(o)?'is-late':''}"><div class="top"><button class="linkbtn" data-act="open" data-id="${o.id}">OS ${o.num}</button>${pill(o)}</div>
-    <div class="svc">${esc(svcOf(o).name)}${o.remake?' <span class="chip warn">Retrabalho</span>':''}</div>${kidsTxt(o)?`<div class="mut" style="font-size:12px">+ ${esc(kidsTxt(o))}</div>`:''}<div class="meta"><span>${esc(cliOf(o.client).name)}</span><span class="teeth">${teethTxt(o)}</span><span class="shade">${esc(o.shade)}</span>${boxOf(o)?`<span class="chip" title="Caixa">cx ${esc(boxOf(o))}</span>`:''}${pendRet(o).length?`<span class="chip warn" title="${esc(pendRet(o).map(rcvName).join(', '))}">devolver ${pendRet(o).length}</span>`:''}</div>
+    <div class="svc">${esc(svcOf(o).name)}${o.remake?' <span class="chip warn">Retrabalho</span>':''}</div>${kidsTxt(o)?`<div class="mut" style="font-size:12px">+ ${esc(kidsTxt(o))}</div>`:''}<div class="meta"><span>${esc(cliOf(o.client).name)}</span><span class="teeth">${teethTxt(o)}</span><span class="shade">${esc(o.shade)}</span>${boxOf(o)?`<span class="chip" title="Caixa">cx ${esc(boxOf(o))}</span>`:''}${psiOf(o).length?`<span class="chip" title="Sobre implante: ${psiOf(o).join(' ')}">PSI ${psiOf(o).length}</span>`:''}${pendRet(o).length?`<span class="chip warn" title="${esc(pendRet(o).map(rcvName).join(', '))}">devolver ${pendRet(o).length}</span>`:''}</div>
     <div class="act">${myTech()?`<span class="mut" style="font-size:12.5px">${myStage(o)?'Com você':esc(techOf(defaultTech(o,st)).name)}</span>`:techSelect(o,st)}${o.prova?'<span class="chip">Com o dentista</span>':myStage(o)?`<button class="btn sm primary" data-act="adv" data-id="${o.id}">Concluir</button>`:''}</div></article>`};
   return head(myTech()?'Minha produção':'Produção',myTech()?`Os trabalhos que estão com você, ${esc(curUser().name)}, e os que você já fez. Ao concluir, o trabalho segue para a próxima etapa.`:'Cada coluna é uma etapa. Ao concluir, o trabalho segue para a próxima etapa e a comissão de quem executou é registrada.',
     '<button class="btn" data-act="scan">Ler QR</button>'+(can('os')||!myTech()?''+(can('valores')?'<button class="btn" data-act="bench-all">Fichas do dentista</button>':'')+'<button class="btn" data-act="qr-all">Etiquetas QR</button>':'')+(myTech()?'':sel('ui-prodTech',[['','Toda a equipe'],...S.team.map(t=>[t.id,t.name])],UI.prodTech,'data-ui="prodTech" aria-label="Filtrar por profissional" style="width:auto"')+(can('os')?'<button class="btn primary" data-act="new">+ Novo trabalho</button>':'')))+
@@ -3593,7 +3593,7 @@ function extratoDraw(P,o){const M=P.M,W=P.PW-2*M,ink=[20,24,28],mut=[90,98,104],
   T('Subtotal '+fmt(tot),M+W,y+11,9,{align:'right'});y+=22;P.line(M,y-6,M+W,[220,224,227]);
   /* dados à esquerda */
   const yL=y;let ly=y+8;const lab=(k,v)=>{T(k+':',M,ly,9);if(v)P.text(v,M+pdfW(k+': ',9,1),ly,9,{c:ink});ly+=13};
-  const md=moldOf(o);lab('Escala',md.scale||'');lab('Cor',o.shade||'');lab('Antagonista',md.antag||'');lab('Modelo',md.model||'');lab('Mat. Forne.',md.matForn||'');lab('Mat. Devol.',md.matDev||'');lab('Caixa',boxOf(o));if(recvOf(o).length){const rt=pdfTx(recvTxt(o));lab('Recebido',rt.length>30?rt.slice(0,28)+'...':rt)}
+  const md=moldOf(o);lab('Escala',md.scale||'');lab('Cor',o.shade||'');lab('Antagonista',md.antag||'');lab('Modelo',md.model||'');lab('Mat. Forne.',md.matForn||'');lab('Mat. Devol.',md.matDev||'');lab('Caixa',boxOf(o));if(psiOf(o).length)lab('Implante (PSI)',psiOf(o).join(' '));if(recvOf(o).length){const rt=pdfTx(recvTxt(o));lab('Recebido',rt.length>30?rt.slice(0,28)+'...':rt)}
   if(o.notes){T('OBS:',M,ly+2,9,{c:red});pdfWrap(pdfTx(o.notes),140,9,1).slice(0,6).forEach((l,i)=>T(l,M,ly+15+i*12,9,{c:red}))}
   /* odontograma */
   const gx=M+148,gw=W-148-196,tw=gw/16,top=[18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28],bot=[48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38],sel=new Set([o,...kids].flatMap(x=>x.teeth||[]).map(Number));
@@ -3608,8 +3608,10 @@ function extratoDraw(P,o){const M=P.M,W=P.PW-2*M,ink=[20,24,28],mut=[90,98,104],
   if(lp){T('Informativo do último pagamento:',rx,y+70,7.5);T(dm(lp.paidAt)+' '+fmt(recVal(lp)),rx,y+81,7.5)}
   P.line(rx,y+112,rx+184,ink,.7);P.text('Recebi(emos) o(s) trabalho(s) acima',rx+184,y+122,7,{align:'right',c:mut});
   P.y=Math.max(ly+90,y+140)}
-async function extratoAllPdf(orders,fname){if(!orders.length){toast('Nenhuma OS para imprimir');return}if(!can('valores')){toast('Seu perfil não permite ver valores.');return}let b;try{const P=pdfMake(false);orders.forEach((o,i)=>{if(i)P.page();extratoDraw(P,o)});b=P.blob(`${S.settings.lab||'CERIONE'} · Fichas do dentista · emitidas em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar as fichas');return}await relSave(fname,b,'application/pdf')}
-async function extratoPdf(o){let b;try{const P=pdfMake(false);extratoDraw(P,o);b=P.blob(`${S.settings.lab||'CERIONE'} · Extrato da OS ${o.num} · emitido em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar o extrato');return}await relSave(`extrato-os-${o.num}.pdf`,b,'application/pdf')}
+/* abre o PDF numa aba para ver e imprimir (o leitor do navegador também baixa) */
+function pdfOpen(b,fname){if(window.PDF_DOWNLOAD)return relSave(fname,b,'application/pdf');let w=null;try{const u=URL.createObjectURL(b);w=window.open(u,'_blank');if(w){setTimeout(()=>URL.revokeObjectURL(u),300000);toast('Ficha aberta numa nova aba: use Imprimir ou Baixar no leitor de PDF.');return}}catch(e){}toast('O navegador bloqueou a nova aba: baixando o PDF.');return relSave(fname,b,'application/pdf')}
+async function extratoAllPdf(orders,fname){if(!orders.length){toast('Nenhuma OS para imprimir');return}if(!can('valores')){toast('Seu perfil não permite ver valores.');return}let b;try{const P=pdfMake(false);orders.forEach((o,i)=>{if(i)P.page();extratoDraw(P,o)});b=P.blob(`${S.settings.lab||'CERIONE'} · Fichas do dentista · emitidas em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar as fichas');return}pdfOpen(b,fname)}
+async function extratoPdf(o){let b;try{const P=pdfMake(false);extratoDraw(P,o);b=P.blob(`${S.settings.lab||'CERIONE'} · Extrato da OS ${o.num} · emitido em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar o extrato');return}pdfOpen(b,`ficha-dentista-os-${o.num}.pdf`)}
 document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-ext]');if(!t)return;const o=find('orders',t.dataset.ext);if(o)extratoPdf(o.parent?find('orders',o.parent)||o:o)});
 /* ================= Relatórios de produção: indicadores do mês e analítico por tipo de peça ================= */
 {const roots=()=>S.orders.filter(o=>!o.parent&&mine(o));
@@ -4496,6 +4498,95 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
 /* detalhe da OS: corrigir comissão em cada etapa feita */
 {const _o=openOrder;window.openOrder=openOrder=function(id,...a){const r=_o(id,...a);try{if(!canCommFix())return r;let o=S.orders.find(x=>x.id===id);if(o&&o.parent)o=S.orders.find(x=>x.id===o.parent)||o;if(!o)return r;
   const items=[...document.querySelectorAll('#modal .tl .tl-i')];svcOf(o).stages.forEach((s,i)=>{const hi=o.history.findIndex(x=>x.stage===s);const el=items[i];if(hi<0||!el||o.remake)return;const w=el.querySelector('.who');if(w)w.insertAdjacentHTML('beforeend',`${o.history[hi].adj?' <span class="chip warn">comissão corrigida</span>':''} <button class="linkbtn" style="font-size:12px" data-cmfix="${o.id}" data-hi="${hi}">corrigir comissão</button>`)})}catch(e){}return r}}
+
+/* Reabilitação: no odontograma cada dente é "sobre dente" ou "sobre implante (PSI)".
+   Clique 1× = sobre dente, 2× = sobre implante, 3× = desmarca. Os dentes PSI trazem link + análogo sozinhos. */
+const psiOf=o=>(o&&Array.isArray(o.psi))?o.psi.filter(t=>(o.teeth||[]).includes(t)):[];
+const psiPick=rx=>S.services.filter(s=>s.active!==false&&!s.archived&&rx.test(s.name)).sort((a,b)=>a.name.length-b.name.length)[0];
+const PSI_KINDS=[['link',/\blink\b/i,'Link'],['ana',/an[aá]logo(?!.*mini)/i,'Análogo']];
+function psiSync(){if(!draft)return;draft.psi=(draft.psi||[]).filter(t=>draft.teeth.includes(t));draft.extras=draft.extras||[];draft.psiOff=draft.psiOff||{};const P=draft.psi,n=P.length;
+  PSI_KINDS.forEach(([k,rx])=>{const s=psiPick(rx);const i=draft.extras.findIndex(e=>e.auto===k);
+    if(!n||!s||draft.psiOff[k]){if(i>=0&&!n)draft.extras.splice(i,1);return}
+    if(i<0){if(draft.extras.some(e=>!e.auto&&e.service===s.id))return;draft.extras.push({service:s.id,qty:n,priceTxt:'',teethTxt:P.join(' '),note:'PSI',auto:k})}
+    else Object.assign(draft.extras[i],{qty:n,teethTxt:P.join(' ')})})}
+{const _r=renderNewOrder;window.renderNewOrder=renderNewOrder=function(...a){
+  if(draft&&draft.editId&&!draft.__psiInit){draft.__psiInit=1;const o=S.orders.find(x=>x.id===draft.editId);draft.psi=psiOf(o);
+    /* itens que já existem e batem com link/análogo dos PSI passam a ser acompanhados */
+    if(draft.psi.length)PSI_KINDS.forEach(([k,rx])=>{const s=psiPick(rx),e=s&&(draft.extras||[]).find(x=>x.service===s.id&&!x.auto);if(e)e.auto=k})}
+  psiSync();const r=_r(...a);
+  try{const lg=document.querySelector('#noForm .odo-legend');if(lg&&!document.getElementById('psi-help')){const nd=draft.teeth.length-draft.psi.length,np=draft.psi.length;
+    lg.insertAdjacentHTML('afterend',`<div id="psi-help" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin-top:6px"><span class="mut">Clique 1× = sobre dente · 2× = sobre implante (PSI) · 3× desmarca</span><span><span class="psi-sw"></span> Sobre dente: <b>${nd}</b></span><span><span class="psi-sw psi"></span> Sobre implante (PSI): <b>${np}</b>${np?` <span class="mut">· link e análogo entram sozinhos</span>`:''}</span></div>`)}}catch(e){}
+  return r}}
+/* clique no dente: dente → implante → desmarca */
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('#noForm [data-act=tooth]');if(!t||!draft)return;e.preventDefault();e.stopImmediatePropagation();
+  const n=+t.dataset.t;draft.psi=draft.psi||[];
+  if(!draft.teeth.includes(n))draft.teeth=[...draft.teeth,n];
+  else if(!draft.psi.includes(n))draft.psi=[...draft.psi,n];
+  else{draft.teeth=draft.teeth.filter(x=>x!==n);draft.psi=draft.psi.filter(x=>x!==n)}
+  renderNewOrder()},true);
+/* remover link/análogo automático: não volta mais nesta OS */
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('#noForm [data-act=nx-del]');if(!t||!draft)return;const x=(draft.extras||[])[+t.dataset.i];if(x&&x.auto){draft.psiOff=draft.psiOff||{};draft.psiOff[x.auto]=true}},true);
+/* marca visual dos dentes PSI */
+{const _r2=renderNewOrder;window.renderNewOrder=renderNewOrder=function(...a){const r=_r2(...a);try{(draft.psi||[]).forEach(n=>{const b=document.querySelector(`#noForm [data-act=tooth][data-t="${n}"]`);if(b){b.dataset.psi='1';b.title='Sobre implante (PSI)'}})}catch(e){}return r}}
+{const st=document.createElement('style');st.textContent='.tooth[data-psi]{background:#6b46c1!important;border-color:#6b46c1!important;color:#fff!important;box-shadow:inset 0 -3px 0 rgba(255,255,255,.55)}.psi-sw{display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--accent);vertical-align:-1px;margin-right:2px}.psi-sw.psi{background:#6b46c1}';document.head.appendChild(st)}
+/* salvar */
+{const _c=createOrder;window.createOrder=createOrder=function(...a){const o=_c(...a);const p=(draft.psi||[]).filter(t=>o.teeth.includes(t)).sort((a,b)=>a-b);if(p.length)o.psi=p;return o}}
+{const _u=updateOrder;window.updateOrder=updateOrder=function(...a){const o=_u(...a);const p=(draft.psi||[]).filter(t=>o.teeth.includes(t)).sort((a,b)=>a-b);if(p.length)o.psi=p;else delete o.psi;return o}}
+/* mostrar: detalhe da OS */
+const psiTxt=o=>{const p=psiOf(o);if(!p.length)return'';const d=o.teeth.filter(t=>!p.includes(t));return(d.length?'Sobre dente: '+d.join(' ')+' · ':'')+'Sobre implante (PSI): '+p.join(' ')};
+{const _o=openOrder;window.openOrder=openOrder=function(id,...a){const r=_o(id,...a);try{let o=S.orders.find(x=>x.id===id);if(o&&o.parent)o=S.orders.find(x=>x.id===o.parent)||o;const t=o&&psiTxt(o);if(t){const k=[...document.querySelectorAll('#sheet .dl .k')].find(x=>x.textContent==='Dentes');if(k)k.parentElement.insertAdjacentHTML('beforeend',`<div class="mut" style="font-size:12px">${esc(t)}</div>`)}}catch(e){}return r}}
+
+/* Arquivos do caso (fotos, STL, PDF) na OS: guardados no armazenamento do laboratório (bucket "casos"),
+   acessados por um botão para não alongar a tela. Pedidos do portal/WhatsApp trazem os arquivos do dentista. */
+const filesOf=o=>(o&&Array.isArray(o.files))?o.files:[];
+const filesCloud=()=>!!(window.CERIONE_CLOUD&&CERIONE_CLOUD.lab&&CERIONE_CLOUD.sb);
+const FILE_OK=/\.(jpe?g|png|webp|heic|gif|stl|ply|obj|3mf|dcm|zip|pdf|mp4|mov)$/i,FILE_MAX=50*1024*1024;
+const fileIcon=f=>/\.(jpe?g|png|webp|heic|gif)$/i.test(f.name)?'🖼️':/\.(stl|ply|obj|3mf|dcm)$/i.test(f.name)?'🦷':/\.pdf$/i.test(f.name)?'📄':/\.(mp4|mov)$/i.test(f.name)?'🎬':'📎';
+const fileSize=n=>n>=1048576?(n/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(n/1024))+' KB';
+async function filesUpload(list){if(!filesCloud()){toast('Os arquivos do caso ficam na versão online do CERIONE.');return[]}
+  const C2=CERIONE_CLOUD,out=[],bad=[];const L=[...list];
+  for(const f of L){if(!FILE_OK.test(f.name)){bad.push(f.name+' (tipo não aceito)');continue}if(f.size>FILE_MAX){bad.push(f.name+' (acima de 50 MB)');continue}
+    const name=f.name.replace(/[^\w.\-]+/g,'_').slice(-120),path=`${C2.lab.id}/os/${(crypto.randomUUID?crypto.randomUUID():uid('f'))}/${name}`;
+    toast(`Enviando ${f.name}…`);
+    try{const{error}=await C2.sb.storage.from('casos').upload(path,f,{contentType:f.type||'application/octet-stream',upsert:false});if(error)throw error;
+      const u=curUser();out.push({b:'casos',path,name:f.name,size:f.size,at:new Date().toISOString(),by:u?u.name:''})}catch(e){console.error(e);bad.push(f.name+' (falha no envio)')}}
+  toast(out.length?`${out.length} arquivo(s) anexado(s)`+(bad.length?' · não enviados: '+bad.join(', '):''):'Nenhum arquivo enviado'+(bad.length?': '+bad.join(', '):''));return out}
+async function fileOpen(f){if(!filesCloud()){toast('Abra pela versão online do CERIONE.');return}const w=window.open('','_blank');
+  try{const{data,error}=await CERIONE_CLOUD.sb.storage.from(f.b||'casos').createSignedUrl(f.path,900);if(error)throw error;if(w)w.location.href=data.signedUrl;else window.open(data.signedUrl,'_blank','noopener')}catch(e){if(w)w.close();toast('Não foi possível abrir o arquivo')}}
+const filesListHtml=(F,del)=>F.length?`<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${F.map((f,i)=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap"><button type="button" class="linkbtn" data-fopen="${i}" style="text-align:left;flex:1;min-width:160px">${fileIcon(f)} ${esc(f.name)}</button><span class="mut" style="font-size:11.5px">${f.size?fileSize(f.size):''}${f.b==='portal'?' · enviado pelo dentista':f.by?' · '+esc(f.by):''}</span>${del?`<button type="button" class="btn sm ghost" data-fdel="${i}" aria-label="Remover ${esc(f.name)}">✕</button>`:''}</div>`).join('')}</div>`:'<p class="mut" style="font-size:12.5px;margin:6px 0 0">Nenhum arquivo ainda.</p>';
+/* formulário da OS: uma linha só; a lista abre no botão */
+function filesFormRow(){const F=(draft&&draft.files)||[];return`<div class="field" id="fl-row" style="grid-column:1/-1"><span class="lbl">Fotos e arquivos do caso (STL, fotos, PDF)</span>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px"><label class="btn sm" style="cursor:pointer">📎 Anexar fotos, STL ou PDF<input type="file" id="fl-in" multiple hidden accept="image/*,.pdf,.stl,.ply,.obj,.3mf,.dcm,.zip,.mp4,.mov"></label>
+  ${F.length?`<button type="button" class="btn sm" data-ftoggle="1">Ver arquivos (${F.length})</button>`:'<span class="mut" style="font-size:12.5px">nenhum arquivo</span>'}</div>
+  <div id="fl-list" ${draft&&draft.__flOpen?'':'hidden'}>${filesListHtml(F,true)}</div></div>`}
+{const _r=renderNewOrder;window.renderNewOrder=renderNewOrder=function(...a){if(draft&&draft.editId&&!draft.__flInit){draft.__flInit=1;const o=S.orders.find(x=>x.id===draft.editId);draft.files=filesOf(o).slice()}
+  const r=_r(...a);try{const n=document.getElementById('no-notes'),fd=n&&n.closest('.field');if(fd&&!document.getElementById('fl-row'))fd.insertAdjacentHTML('afterend',filesFormRow())}catch(e){}return r}}
+const flRepaint=()=>{const r=document.getElementById('fl-row');if(r)r.outerHTML=filesFormRow()};
+document.addEventListener('change',async e=>{const t=e.target;if(!t)return;
+  if(t.id==='fl-in'&&draft){const got=await filesUpload(t.files||[]);if(got.length&&draft){draft.files=[...(draft.files||[]),...got];draft.__flOpen=1;flRepaint()}t.value='';return}
+  if(t.id==='fo-in'){const o=S.orders.find(x=>x.id===t.dataset.id);const got=await filesUpload(t.files||[]);if(got.length&&o){o.files=[...filesOf(o),...got];try{auditPush({kind:'os',label:'OS '+o.num,txt:'Arquivos anexados: '+got.map(f=>f.name).join(', ')})}catch(x){}save();filesModal(o.id)}return}});
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-ftoggle],[data-fopen],[data-fdel],[data-fos],[data-fback]');if(!t)return;
+  const inForm=!!t.closest('#noForm'),mo=!inForm&&document.getElementById('fm-box'),o=mo?S.orders.find(x=>x.id===mo.dataset.id):null;
+  if(t.dataset.ftoggle){e.preventDefault();draft.__flOpen=draft.__flOpen?0:1;const l=document.getElementById('fl-list');if(l)l.hidden=!draft.__flOpen;return}
+  if(t.dataset.fos){e.preventDefault();filesModal(t.dataset.fos);return}
+  if(t.dataset.fback){e.preventDefault();openOrder(t.dataset.fback);return}
+  const F=inForm?(draft.files||[]):filesOf(o),i=+(t.dataset.fopen??t.dataset.fdel),f=F[i];if(!f)return;e.preventDefault();
+  if(t.dataset.fopen!=null){fileOpen(f);return}
+  if(!can('os')){toast('Seu perfil não permite remover arquivos.');return}
+  if(t.dataset.armed!=='1'){t.dataset.armed='1';t.textContent='Remover?';setTimeout(()=>{if(t.isConnected){t.dataset.armed='';t.textContent='✕'}},3000);return}
+  if(inForm){draft.files=F.filter((_,j)=>j!==i);draft.__flOpen=1;flRepaint();return}
+  o.files=F.filter((_,j)=>j!==i);try{auditPush({kind:'os',label:'OS '+o.num,txt:'Arquivo removido do caso: '+f.name})}catch(x){}save();
+  if(f.b!=='portal'&&filesCloud())CERIONE_CLOUD.sb.storage.from('casos').remove([f.path]).catch(()=>{});filesModal(o.id)},true);
+/* salvar */
+{const _c=createOrder;window.createOrder=createOrder=function(...a){const o=_c(...a);if((draft.files||[]).length)o.files=draft.files.slice();return o}}
+{const _u=updateOrder;window.updateOrder=updateOrder=function(...a){const o=_u(...a);if((draft.files||[]).length)o.files=draft.files.slice();else delete o.files;return o}}
+/* OS: botão "Arquivos do caso (N)" e a janela com a lista */
+function filesModal(id){const o=S.orders.find(x=>x.id===id);if(!o)return;const F=filesOf(o);
+  openModal(mhead('Arquivos do caso','OS '+o.num+' · '+esc(cliOf(o.client).name)+(o.patient?' · '+esc(o.patient):''))+`<div id="fm-box" data-id="${o.id}" class="grid">
+  ${filesListHtml(F,can('os'))}
+  <div class="sheet-foot"><label class="btn" style="cursor:pointer">📎 Anexar mais<input type="file" id="fo-in" data-id="${o.id}" multiple hidden accept="image/*,.pdf,.stl,.ply,.obj,.3mf,.dcm,.zip,.mp4,.mov"></label><button type="button" class="btn primary" data-fback="${o.id}">Voltar para a OS</button></div></div>`)}
+{const _o=openOrder;window.openOrder=openOrder=function(id,...a){const r=_o(id,...a);try{let o=S.orders.find(x=>x.id===id);if(o&&o.parent)o=S.orders.find(x=>x.id===o.parent)||o;const g=document.querySelector('#sheet #os-acts');
+  if(o&&g&&!g.querySelector('[data-fos]')){const h=`<button class="btn" data-fos="${o.id}">📎 Arquivos do caso${filesOf(o).length?' ('+filesOf(o).length+')':''}</button>`,ex=g.querySelector('[data-ext]');if(ex)ex.insertAdjacentHTML('afterend',h);else g.insertAdjacentHTML('afterbegin',h)}}catch(e){}return r}}
 
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}

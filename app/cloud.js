@@ -375,7 +375,7 @@ function ptMakeOS(id){const r=(PT.reqs||[]).find(x=>x.id==id);if(!r)return;const
   const s=find('services',d.service);draft.client=cliOf(r.client_id)?r.client_id:draft.client;if(s)draft.service=s.id;
   draft.teeth=(d.teeth||[]).map(Number);if(d.qty&&(!s||(s.unit||'elemento')!=='elemento'))draft.qty=d.qty;draft.shade=d.shade||draft.shade;if(d.due)draft.due=d.due;draft.patient=d.patient||'';draft.urgent=!!d.urgent;
   draft.notes=[r.source==='whatsapp'?`Pedido nº ${r.id} pelo WhatsApp (lido pela IA, conferido).`:`Pedido nº ${r.id} pelo portal do dentista.`,d.remake_of?`Ajuste/retrabalho da OS ${d.remake_of}.`:'',d.impression?`Moldagem: ${d.impression==='digital'?'escaneamento digital':'física'}.`:'',d.pickup?'Pediu retirada no consultório.':'',(r.files||[]).length?`${r.files.length} arquivo(s) anexado(s) no pedido.`:'',d.notes||''].filter(Boolean).join(' ');
-  draft.portalReq=r.id;renderNewOrder();if(r.source==='whatsapp'&&((r.ai||{}).doubts||[]).length)toast('Confira: '+r.ai.doubts.slice(0,2).join(' · '))}
+  draft.portalReq=r.id;if((r.files||[]).length)draft.files=r.files.map(f=>({b:'portal',path:f.path,name:f.name||String(f.path).split('/').pop(),size:f.size||0,at:r.created_at||''}));renderNewOrder();if(r.source==='whatsapp'&&((r.ai||{}).doubts||[]).length)toast('Confira: '+r.ai.doubts.slice(0,2).join(' · '))}
 async function ptSet(id,status,reply,num){const{error}=await C.sb.rpc('portal_request_set',{p_lab:C.lab.id,p_id:+id,p_status:status,p_reply:reply||null,p_order_num:num||null});if(error)throw error;
   const r=(PT.reqs||[]).find(x=>x.id==id);if(r){r.status=status;if(reply)r.reply=reply;if(num)r.order_num=num}PT.pending=Math.max(0,PT.pending-(status!=='novo'?1:0))}
 async function ptAct(a,b){
