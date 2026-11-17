@@ -1277,8 +1277,8 @@ V.pagar=()=>{
   const pk='pay',list=S.payables.filter(p=>(UI.payTab==='aberto'?p.status!=='pago':UI.payTab==='vencidas'?p.status!=='pago'&&daysTo(p.due)<0:p.status==='pago')&&inPer(pk,UI.payTab==='pagas'?p.paidAt:p.due)&&(!UI.payGrp||gOf(p)===UI.payGrp)&&(!q0||(p.desc+' '+accLabel(p.acct)+' '+(supOf(p.sup).name||'')).toLowerCase().includes(q0))&&catOk('pay',accOf(p.acct))&&metOk('pay',p.method)).sort((a,b)=>UI.payTab==='pagas'?b.paidAt.localeCompare(a.paidAt):a.due.localeCompare(b.due));
   const grps=Object.keys(GROUPS).filter(g=>GROUPS[g][1]==='pay'&&S.payables.some(p=>gOf(p)===g));
   const tot=list.reduce((a,p)=>a+p.amount,0);
-  return head('Contas a pagar','Todas as saídas classificadas no plano de contas: custos fixos, variáveis, impostos, investimentos, estoque e retiradas.',`<button class="btn" data-act="post-fixed" ${fixPosted?'disabled title="Já lançados neste mês"':''}>Lançar custos fixos de ${MONTHS[today0().getMonth()]}</button><button class="btn primary" data-act="ent-form" data-k="payables">+ Nova conta</button>`)+
-  `<div class="toolbar">${perBar('pay','Período',{hint:'vale para tudo nesta tela: vencimento das contas e data do pagamento'})}</div><div class="kpis">${kpi('Em aberto',fmt(open.reduce((a,p)=>a+p.amount,0)),`${open.length} contas${hasP?' · vencimento '+perTxt('pay'):''}`)}${kpi('Vencido',fmt(late.reduce((a,p)=>a+p.amount,0)),`${late.length} contas`,late.length?'alert':'')}${hasP?kpi('A vencer',fmt(open.filter(p=>daysTo(p.due)>=0).reduce((a,p)=>a+p.amount,0)),`${open.filter(p=>daysTo(p.due)>=0).length} contas no período`)+kpi('Pago no período',fmt(paidP.reduce((a,p)=>a+payOut(p),0)),`${paidP.length} pagamento${paidP.length===1?'':'s'} · com juros e descontos`):kpi('Próximos 7 dias',fmt(week.reduce((a,p)=>a+p.amount,0)),`${week.length} contas`)+(()=>{const F=finSum().pay;return kpi('Pago hoje',fmt(F.today),`${F.todayN} pagamento${F.todayN===1?'':'s'}`)+kpi('Pago no mês',fmt(F.month),monthLabel(k)+' · com juros e descontos')})()}</div>
+  return head('Contas a pagar','Todas as saídas classificadas no plano de contas: custos fixos, variáveis, impostos, investimentos, estoque e retiradas.',`${(()=>{const pf=fixPending('pay');return pf.length?`<button class="btn" data-act="post-fixed" data-k="${pf.join(',')}"${pf.length>1?` data-confirm="Confirmar: lançar ${pf.length} meses"`:''}>Lançar custos fixos de ${pf.length===1?monthShort(pf[0]):pf.length+' meses'}</button>`:`<button class="btn" disabled title="Os custos fixos dos meses do período já foram lançados">Custos fixos ${perOn('pay')?'do período':'de '+MONTHS[today0().getMonth()]} já lançados</button>`})()}<button class="btn primary" data-act="ent-form" data-k="payables">+ Nova conta</button>`)+
+  `<div class="toolbar">${perBar('pay','Período',{hint:'vale para tudo nesta tela: vencimento das contas e data do pagamento'})}</div>${(()=>{const pf=fixPending('pay');if(!pf.length)return'';const v=S.fixed.reduce((a,f)=>a+(+f.value||0),0);return`<p class="note" style="margin:0 0 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Custos fixos ainda não lançados ${perOn('pay')?'no período':'neste mês'} (${S.fixed.length} itens · ${fmt(v)} por mês):</span>${pf.map(k=>`<button class="btn sm" data-act="post-fixed" data-k="${k}">Lançar ${monthShort(k)}</button>`).join('')}${pf.length>1?`<button class="btn sm primary" data-act="post-fixed" data-k="${pf.join(',')}" data-confirm="Confirmar: lançar ${pf.length} meses">Lançar todos</button>`:''}</p>`})()}<div class="kpis">${kpi('Em aberto',fmt(open.reduce((a,p)=>a+p.amount,0)),`${open.length} contas${hasP?' · vencimento '+perTxt('pay'):''}`)}${kpi('Vencido',fmt(late.reduce((a,p)=>a+p.amount,0)),`${late.length} contas`,late.length?'alert':'')}${hasP?kpi('A vencer',fmt(open.filter(p=>daysTo(p.due)>=0).reduce((a,p)=>a+p.amount,0)),`${open.filter(p=>daysTo(p.due)>=0).length} contas no período`)+kpi('Pago no período',fmt(paidP.reduce((a,p)=>a+payOut(p),0)),`${paidP.length} pagamento${paidP.length===1?'':'s'} · com juros e descontos`):kpi('Próximos 7 dias',fmt(week.reduce((a,p)=>a+p.amount,0)),`${week.length} contas`)+(()=>{const F=finSum().pay;return kpi('Pago hoje',fmt(F.today),`${F.todayN} pagamento${F.todayN===1?'':'s'}`)+kpi('Pago no mês',fmt(F.month),monthLabel(k)+' · com juros e descontos')})()}</div>
   <div class="toolbar">${seg('payTab',[['aberto','Em aberto'],['vencidas',`Vencidas${late.length?` (${late.length})`:''}`],['pagas','Pagas']])}
   ${sel('ui-payGrp',[['','Todos os grupos'],...grps.map(g=>[g,GROUPS[g][0]])],UI.payGrp,'data-ui="payGrp" aria-label="Grupo" style="width:auto"')}
   <input type="search" id="payq" data-q="payQ" placeholder="Buscar descrição, categoria ou fornecedor…" value="${esc(UI.payQ||'')}" aria-label="Buscar" style="flex:1;min-width:200px"></div>`+catBar('pay',S.payables.map(p=>accOf(p.acct)),S.payables.map(p=>p.method))+(UI.payView==='cat'?catSummary('pay',list,p=>accOf(p.acct),p=>p.status==='pago'?payOut(p):p.amount):
@@ -2881,10 +2881,13 @@ function back(id){
   o.idx--;while(o.idx>0&&(o.skip||[]).includes(svcOf(o).stages[o.idx]))o.idx--;const st=svcOf(o).stages[o.idx];const hi=o.history.map(h=>h.stage).lastIndexOf(st);if(hi>=0)o.history.splice(hi,1);
   o.status='producao';o.delivered=null;save();toast(`OS ${o.num} voltou para ${SN[st]}`);
 }
-function postFixed(){
-  const k=monthKey(0);if(S.posted.fix.includes(k))return;
-  S.fixed.forEach(f=>S.payables.push({id:uid('p'),acct:f.acct||guessPayAcc(f.name,'Custo fixo'),comp:k,desc:f.name+' · '+monthShort(k),cat:'Custo fixo',sup:'',amount:+f.value,due:dayIn(k,+f.day||10),status:'aberto',paidAt:null,method:null,ref:'fix:'+f.id+':'+k}));
-  S.posted.fix.push(k);save();toast(`${S.fixed.length} custos fixos lançados`);
+/* meses do período (até 24) para os custos fixos; sem período = mês atual */
+function fixMonths(per){const p=perGet(per||'pay');if(!p.de&&!p.ate)return[monthKey(0)];const a=(p.de||p.ate).slice(0,7),b=(p.ate||p.de).slice(0,7),out=[];let[y,m]=a.split('-').map(Number);while(out.length<24){const k=y+'-'+String(m).padStart(2,'0');if(k>b)break;out.push(k);m++;if(m>12){m=1;y++}}return out}
+const fixPending=per=>S.fixed.some(f=>+f.value>0)?fixMonths(per).filter(k=>!S.posted.fix.includes(k)):[];
+function postFixed(k){
+  k=k||monthKey(0);if(S.posted.fix.includes(k))return 0;
+  S.fixed.filter(f=>!S.payables.some(p=>p.ref==='fix:'+f.id+':'+k)).forEach(f=>S.payables.push({id:uid('p'),acct:f.acct||guessPayAcc(f.name,'Custo fixo'),comp:k,desc:f.name+' · '+monthShort(k),cat:'Custo fixo',sup:'',amount:+f.value,due:dayIn(k,+f.day||10),status:'aberto',paidAt:null,method:null,ref:'fix:'+f.id+':'+k}));
+  S.posted.fix.push(k);save();toast(`${S.fixed.length} custos fixos de ${monthShort(k)} lançados`);return S.fixed.length;
 }
 function postComm(){
   const k=UI.commMonth;if(S.posted.com.includes(k))return;const by={};
@@ -3054,7 +3057,7 @@ document.addEventListener('click',e=>{
     case'stmt-copy':copyText(stmtText(),'Extrato copiado. Cole no WhatsApp ou e-mail do dentista.');break;
     case'dun-copy':copyText(dunText(find('receivables',id)),'Mensagem de cobrança copiada');{const r=find('receivables',id);r.lastDun=addDays(0);save();render()}break;
     case'pay-pay':case'pp-open':payPayForm(id);break;
-    case'post-fixed':postFixed();render();break;
+    case'post-fixed':{const ks=String(t.dataset.k||monthKey(0)).split(',').filter(Boolean);let n=0;ks.forEach(k=>n+=postFixed(k)||0);render();if(ks.length>1)toast(`Custos fixos lançados: ${ks.map(monthShort).join(', ')} (${n} contas)`);break}
     case'post-comm':postComm();render();break;
     case'reset':{const mode=t.dataset.mode;
       if(resetArmed!==mode){resetArmed=mode;t.textContent='Clique de novo para confirmar';setTimeout(()=>{if(resetArmed===mode){resetArmed=false;render()}},4000)}
@@ -3611,8 +3614,8 @@ function extratoDraw(P,o){const M=P.M,W=P.PW-2*M,ink=[20,24,28],mut=[90,98,104],
   P.y=Math.max(ly+90,y+140)}
 /* abre o PDF numa aba para ver e imprimir (o leitor do navegador também baixa) */
 function pdfOpen(b,fname){if(window.PDF_DOWNLOAD)return relSave(fname,b,'application/pdf');let w=null;try{const u=URL.createObjectURL(b);w=window.open(u,'_blank');if(w){setTimeout(()=>URL.revokeObjectURL(u),300000);toast('Ficha aberta numa nova aba: use Imprimir ou Baixar no leitor de PDF.');return}}catch(e){}toast('O navegador bloqueou a nova aba: baixando o PDF.');return relSave(fname,b,'application/pdf')}
-async function extratoAllPdf(orders,fname){if(!orders.length){toast('Nenhuma OS para imprimir');return}if(!can('valores')){toast('Seu perfil não permite ver valores.');return}let b;try{const P=pdfMake(false);orders.forEach((o,i)=>{if(i)P.page();extratoDraw(P,o)});b=P.blob(`${S.settings.lab||'CERIONE'} · Fichas do dentista · emitidas em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar as fichas');return}pdfOpen(b,fname)}
-async function extratoPdf(o){let b;try{const P=pdfMake(false);extratoDraw(P,o);b=P.blob(`${S.settings.lab||'CERIONE'} · Extrato da OS ${o.num} · emitido em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar o extrato');return}pdfOpen(b,`ficha-dentista-os-${o.num}.pdf`)}
+async function extratoAllPdf(orders,fname){if(!orders.length){toast('Nenhuma OS para imprimir');return}if(!can('valores')){toast('Seu perfil não permite ver valores.');return}let b;try{const P=pdfMake(false);orders.forEach((o,i)=>{if(i)P.page();extratoDraw(P,o)});b=P.blob(`${S.settings.lab||'CERIONE'} · Fichas do dentista · emitidas em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar as fichas');return}pdfViewer(b,fname,{title:'Fichas do dentista'})}
+async function extratoPdf(o){let b;try{const P=pdfMake(false);extratoDraw(P,o);b=P.blob(`${S.settings.lab||'CERIONE'} · Extrato da OS ${o.num} · emitido em ${new Date().toLocaleString('pt-BR')}`)}catch(e){console.error(e);toast('Não foi possível gerar o extrato');return}pdfViewer(b,`ficha-dentista-os-${o.num}.pdf`,{back:o.id})}
 document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-ext]');if(!t)return;const o=find('orders',t.dataset.ext);if(o)extratoPdf(o.parent?find('orders',o.parent)||o:o)});
 /* ================= Relatórios de produção: indicadores do mês e analítico por tipo de peça ================= */
 {const roots=()=>S.orders.filter(o=>!o.parent&&mine(o));
@@ -4654,6 +4657,36 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   if(t.dataset.perapply){perApply(t.dataset.perapply);return}
   UI[t.dataset.perclr+'De']='';UI[t.dataset.perclr+'Ate']='';render();toast('Período: todo o período')});
 document.addEventListener('keydown',e=>{const t=e.target;if(e.key==='Enter'&&t&&t.dataset&&t.dataset.per){e.preventDefault();perApply(t.dataset.per)}});
+
+/* Visualizador de PDF dentro do sistema: a ficha aparece na tela (computador e celular) e só depois
+   a pessoa escolhe Imprimir ou Baixar. Usa o pdf.js; se não carregar, cai para o leitor do navegador. */
+const PDFJS_V='3.11.174',PDFJS_URL=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/build/`;
+let __pdfjsP=null;
+function pdfjsLoad(){if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);if(__pdfjsP)return __pdfjsP;
+  __pdfjsP=new Promise((ok,ko)=>{const s=document.createElement('script');s.src=PDFJS_URL+'pdf.min.js';s.onload=()=>{try{window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_URL+'pdf.worker.min.js';ok(window.pdfjsLib)}catch(e){ko(e)}};s.onerror=()=>{__pdfjsP=null;ko(new Error('pdf.js'))};document.head.appendChild(s)});return __pdfjsP}
+let __pdfV=null;
+async function pdfViewer(b,fname,o){o=o||{};if(window.PDF_DOWNLOAD)return relSave(fname,b,'application/pdf');
+  __pdfV={b,fname,imgs:[]};
+  openModal(mhead(o.title||'Ficha do dentista',esc(fname))+`<div class="grid" id="pdfv">
+  <div id="pdfv-pages" style="max-height:68vh;overflow:auto;background:var(--sunk,#eef1f3);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:10px;align-items:center"><p class="mut" id="pdfv-load" style="margin:20px 0">Carregando a ficha…</p></div>
+  <div class="sheet-foot"><div style="display:flex;gap:8px;flex-wrap:wrap">${o.back?`<button type="button" class="btn" data-act="open" data-id="${o.back}">Voltar para a OS</button>`:''}</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-pdfv="dl">Baixar PDF</button><button type="button" class="btn primary" data-pdfv="print" disabled>Imprimir</button></div></div></div>`);
+  const box=document.getElementById('pdfv-pages');
+  try{const lib=await pdfjsLoad();const data=new Uint8Array(await b.arrayBuffer());const doc=await lib.getDocument({data,isEvalSupported:false}).promise;
+    if(!document.getElementById('pdfv'))return;box.innerHTML='';const W=Math.min(box.clientWidth-20||700,900);
+    for(let i=1;i<=doc.numPages;i++){const pg=await doc.getPage(i),v1=pg.getViewport({scale:1}),sc=Math.max(1.6,W/v1.width)*(window.devicePixelRatio>1?1.5:1.2),vp=pg.getViewport({scale:sc});
+      const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);c.style.width=W+'px';c.style.maxWidth='100%';c.style.height='auto';c.style.background='#fff';c.style.boxShadow='0 1px 4px rgba(0,0,0,.15)';c.setAttribute('aria-label','Página '+i);
+      box.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;__pdfV.imgs.push(c.toDataURL('image/png'))}
+    const pb=document.querySelector('[data-pdfv=print]');if(pb)pb.disabled=false;
+  }catch(e){console.error(e);if(!document.getElementById('pdfv'))return;
+    /* sem pdf.js: mostra no leitor do navegador dentro da janela */
+    const u=URL.createObjectURL(b);__pdfV.url=u;box.innerHTML=`<iframe src="${u}" title="Ficha" style="width:100%;height:66vh;border:0;background:#fff"></iframe><p class="mut" style="font-size:12px;margin:0">Se a ficha não aparecer aqui, use "Baixar PDF".</p>`;const pb=document.querySelector('[data-pdfv=print]');if(pb)pb.disabled=false}}
+function pdfPrint(){const V=__pdfV;if(!V)return;
+  if(!V.imgs.length&&V.url){const f=document.querySelector('#pdfv iframe');try{f.contentWindow.focus();f.contentWindow.print();return}catch(e){window.open(V.url,'_blank');return}}
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(V.fname)}</title><style>@page{size:A4;margin:0}html,body{margin:0;padding:0}img{display:block;width:100%;height:auto;page-break-after:always;break-after:page}img:last-child{page-break-after:auto;break-after:auto}</style></head><body>${V.imgs.map((s,i)=>`<img src="${s}" alt="Página ${i+1}">`).join('')}</body></html>`;
+  const old=document.getElementById('pdfv-print');if(old)old.remove();const fr=document.createElement('iframe');fr.id='pdfv-print';fr.setAttribute('aria-hidden','true');fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  const u=URL.createObjectURL(new Blob([html],{type:'text/html'}));fr.src=u;fr.onload=()=>{setTimeout(()=>{try{fr.contentWindow.focus();fr.contentWindow.print()}catch(e){window.open(u,'_blank')}},150)};document.body.appendChild(fr);window.__pdfPrinted=(window.__pdfPrinted||0)+1}
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-pdfv]');if(!t||!__pdfV)return;e.preventDefault();
+  if(t.dataset.pdfv==='print')pdfPrint();else relSave(__pdfV.fname,__pdfV.b,'application/pdf')});
 
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
