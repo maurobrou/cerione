@@ -433,7 +433,8 @@ C.boot=function(){if(!window.supabase||!CFG.url){screen('<div class="msg err">Co
     async log(){const{data,error}=await C.sb.rpc('wa_log_list',{p_lab:C.lab.id});if(error)throw error;return data||[]}};
   C.sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   window.save=save=function(){try{auditDiff()}catch(e){}if(C.lab){if(C.st&&!C.st.can_write){setStatus('ro');return}setStatus('saving');schedule()}};
-  window.cfgAccess=cfgAccess=function(){return cloudAccess()};
+  /* usuários vêm da nuvem; o quadro de Privacidade (LGPD) do sistema continua aparecendo logo abaixo */
+  window.cfgAccess=cfgAccess=function(){let lg='';try{const h=_cfgAccess?_cfgAccess():'',i=h.indexOf('<section class="panel"><h2>Privacidade (LGPD)</h2>');if(i>=0)lg=h.slice(i)}catch(e){}return cloudAccess()+lg};
   V.portal=()=>ptView();
   // na nuvem os dados ficam no servidor: some com backup local, recuperação do navegador, zerar/exemplos e importação do Precificador
   if(typeof V.config==='function'){const _vc=V.config,HIDE=/^(Dados do Precificador|Recuperar dados anteriores|Backup dos dados|Dados fictícios|Dados do sistema)$/;
