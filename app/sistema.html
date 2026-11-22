@@ -566,7 +566,7 @@ function seed(){
     if(done){delOff=Math.min(-1,dueOff+pick([-1,0,0,0,1,2]));idx=svc.stages.length}
     else{const prog=Math.max(0,Math.min(.95,(0-cOff)/Math.max(1,dueOff-cOff)));idx=Math.floor(prog*svc.stages.length)}
     const endOff=done?delOff:0,history=[];
-    for(let k=0;k<idx;k++){const st=svc.stages[k];history.push({stage:st,tech:pickTech(team,st,i),at:addDays(cOff+Math.round((endOff-cOff)*(k+1)/(idx+1))),rate:svc.rates[st]||0,elements:n})}
+    for(let k=0;k<idx;k++){const st=svc.stages[k];{const tk=pickTech(team,st,i);history.push({stage:st,tech:tk,at:addDays(cOff+Math.round((endOff-cOff)*(k+1)/(idx+1))),rate:rateFor(svc,st,tk),elements:n})}}
     const mc=r2(svc.bom.reduce((a,b)=>a+costOf(b.mat)*b.qty,0)*n);
     svc.bom.forEach(b=>mv(b.mat,'saida',b.qty*n,addDays(cOff),'OS '+(1001+i)));
     orders.push({id:'o'+(i+1),num:1001+i,client:cl.id,service:svc.id,teeth,shade:pick(['A1','A2','A2','A3','A3.5','B1','BL2']),patient:pick(['L.M.S.','C.R.A.','J.P.O.','M.F.T.','R.S.N.','P.H.G.','A.L.V.','F.C.M.','T.R.B.','N.D.P.','E.S.R.','G.M.F.']),
@@ -714,6 +714,8 @@ const techOf=id=>find('team',id)||{name:'—'};
 const matOf=id=>find('materials',id)||{name:'—',unit:'',cost:0};
 const supOf=id=>find('suppliers',id)||{name:''};
 const curStage=o=>o.status!=='producao'?null:svcOf(o).stages[o.idx];
+/* comissão: valor do colaborador nesta etapa do serviço (s.rateBy[tech][etapa]); sem valor próprio, vale o padrão da etapa (s.rates) */
+function rateFor(s,st,tech){const b=s&&s.rateBy&&tech&&s.rateBy[tech];const v=b?b[st]:undefined;return v!==undefined&&v!==null&&v!==''&&isFinite(+v)?+v:(+((s&&s.rates)||{})[st]||0)}
 const defaultTech=(o,st)=>o.assign[st]||pickTech(S.team.filter(t=>t.active!==false),st,0);
 const stockOf=id=>r2(S.moves.filter(m=>m.mat===id).reduce((a,m)=>a+(m.type==='entrada'?m.qty:m.type==='saida'?-m.qty:m.qty),0));
 const fixedTotal=()=>S.fixed.reduce((a,f)=>a+(+f.value||0),0);
@@ -859,6 +861,8 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 /* ================= UI helpers ================= */
 const kpi=(l,v,h='',cls='')=>`<div class="kpi ${cls}"><span class="l">${l}</span><span class="v">${v}</span><span class="h">${h}</span></div>`;
 const head=(t,sub,actions='')=>`<div class="page-head"><div><h1>${t}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div>${actions?`<div class="toolbar" style="margin:0">${actions}</div>`:''}</div>`;
+/* linha de total no fim da tabela: n colunas, vals={índice da coluna: texto} */
+function sumRow(n,vals,label){const ix=Object.keys(vals).map(Number),f=Math.min(...ix);let h=`<tr class="sum-row"><td colspan="${f}" style="border-top:2px solid var(--line);font-weight:700">${label}</td>`;for(let i=f;i<n;i++)h+=vals[i]!=null?`<td class="n" style="border-top:2px solid var(--line);font-weight:700;white-space:nowrap">${vals[i]}</td>`:'<td style="border-top:2px solid var(--line)"></td>';return h+'</tr>'}
 const tbl=(ths,rows,empty='Nada por aqui ainda.')=>`<div class="tbl-wrap"><table><thead><tr>${ths.map(h=>h.startsWith('#')?`<th class="n">${h.slice(1)}</th>`:`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')||`<tr><td colspan="${ths.length}" class="empty">${empty}</td></tr>`}</tbody></table></div>`;
 const fld=(id,label,inner,full)=>`<div class="field"${full?' style="grid-column:1/-1"':''}><label for="${id}">${label}</label>${inner}</div>`;
 const inp=(id,val='',type='text',extra='')=>`<input type="${type}" id="${id}" value="${esc(val)}" ${extra}>`;
@@ -1253,11 +1257,11 @@ V.receber=()=>{
       <td>${inv?`<button class="linkbtn" data-act="inv-view" data-id="${inv.id}">Nº ${pad4(inv.num)}</button>`:`${esc(r.desc)}<div class="mut" style="font-size:12px">${esc(accLabel(r.acct))}</div>`}</td>${catCells(recAcc(r))}<td>${esc(r.parcel||'1/1')}</td><td class="mono">${dmy(r.due)}</td>
       <td>${UI.recTab==='pagas'?`<span class="mono">${dmy(r.paidAt)}</span>${r.paidAt>r.due?` <span class="mut" style="font-size:12px">(${Math.round((pd(r.paidAt)-pd(r.due))/864e5)}d após)</span>`:''}`:finPill(r)}${r.lastDun&&!isPaid(r)?`<div class="mut" style="font-size:12px">cobrado ${dm(r.lastDun)}</div>`:''}${r.note?`<div class="mut" style="font-size:12px">${esc(r.note)}</div>`:''}</td>
       <td class="mut">${esc(r.method||'—')}${r.antFee?' · antecipado':''}${r.discount?`<div style="font-size:12px">desc. ${fmt(r.discount)}</div>`:''}${(r.fee||r.antFee)&&isPaid(r)?`<div style="font-size:12px">taxas ${fmt((r.fee||0)+(r.antFee||0))} · líquido ${fmt(recNet(r))}</div>`:''}</td><td class="n">${fmt(recVal(r))}</td>
-      <td class="n" style="white-space:nowrap">${isPaid(r)?`<button class="btn sm ghost" data-act="fin-undo" data-k="receivables" data-id="${r.id}" data-confirm="Confirmar estorno">Estornar</button>`:`<button class="btn sm primary" data-act="rec-pay" data-id="${r.id}">Marcar como pago</button> ${d>0?`<button class="btn sm" data-act="dun-copy" data-id="${r.id}" title="Copia uma mensagem de cobrança para o WhatsApp">Cobrar</button> `:''}<button class="btn sm ghost" data-act="ent-form" data-k="receivables" data-id="${r.id}">Editar</button>`}</td></tr>`}),UI.recTab==='pagas'?'Nenhum recebimento registrado.':UI.recTab==='vencidas'?'Nenhuma parcela vencida.':'Nenhuma parcela em aberto.'))+`<p class="mut" style="font-size:12.5px;margin-top:8px">${list.length} parcela${list.length===1?'':'s'} · ${fmt(list.reduce((a,r)=>a+recVal(r),0))} · ${perTxt(rk)}</p>`;
+      <td class="n" style="white-space:nowrap">${isPaid(r)?`<button class="btn sm ghost" data-act="fin-undo" data-k="receivables" data-id="${r.id}" data-confirm="Confirmar estorno">Estornar</button>`:`<button class="btn sm primary" data-act="rec-pay" data-id="${r.id}">Marcar como pago</button> ${d>0?`<button class="btn sm" data-act="dun-copy" data-id="${r.id}" title="Copia uma mensagem de cobrança para o WhatsApp">Cobrar</button> `:''}<button class="btn sm ghost" data-act="ent-form" data-k="receivables" data-id="${r.id}">Editar</button>`}</td></tr>`}).concat(list.length?[sumRow(10,{8:fmt(list.reduce((a,r)=>a+recVal(r),0))},`Total do filtro · ${list.length} parcela${list.length===1?'':'s'}${UI.recTab==='pagas'?' · líquido '+fmt(list.reduce((a,r)=>a+recNet(r),0)):''}`)]:[]),UI.recTab==='pagas'?'Nenhum recebimento registrado.':UI.recTab==='vencidas'?'Nenhuma parcela vencida.':'Nenhuma parcela em aberto.'))+`<p class="mut" style="font-size:12.5px;margin-top:8px">${list.length} parcela${list.length===1?'':'s'} · ${fmt(list.reduce((a,r)=>a+recVal(r),0))} · ${perTxt(rk)}</p>`;
   }else if(UI.recTab==='faturas'){
     const list=S.invoices.filter(i=>(!q0||(cliOf(i.client).name+' '+pad4(i.num)).toLowerCase().includes(q0))&&inPer('rec',i.issue)).sort((a,b)=>b.num-a.num);
     body=`<div class="toolbar"><input type="search" id="recq2" data-q="recQ" placeholder="Buscar dentista ou nº da fatura…" value="${esc(UI.recQ||'')}" aria-label="Buscar" style="flex:1;min-width:200px"></div>`+
-    tbl(['Nº','Emissão','Dentista','Trabalhos','Forma','#Total','#Recebido','Situação'],list.map(i=>{const st=invStatus(i),rs=recsOf(i);return`<tr class="click${(UI.recHi||[]).includes(i.id)?' hi':''}" data-act="inv-view" data-id="${i.id}"><td class="mono">${pad4(i.num)}</td><td class="mono">${dm(i.issue)}</td><td>${esc(cliOf(i.client).name)}</td><td>${i.orders.length}</td><td class="mut">${esc(i.method)}${i.parcels>1?` · ${i.parcels}x`:''}</td><td class="n">${fmt(i.total)}</td><td class="n">${fmt(rs.filter(isPaid).reduce((a,r)=>a+recVal(r),0))}</td><td><span class="pill ${st.k}">${st.t}</span></td></tr>`}),'Nenhuma fatura emitida.');
+    tbl(['Nº','Emissão','Dentista','Trabalhos','Forma','#Total','#Recebido','Situação'],list.map(i=>{const st=invStatus(i),rs=recsOf(i);return`<tr class="click${(UI.recHi||[]).includes(i.id)?' hi':''}" data-act="inv-view" data-id="${i.id}"><td class="mono">${pad4(i.num)}</td><td class="mono">${dm(i.issue)}</td><td>${esc(cliOf(i.client).name)}</td><td>${i.orders.length}</td><td class="mut">${esc(i.method)}${i.parcels>1?` · ${i.parcels}x`:''}</td><td class="n">${fmt(i.total)}</td><td class="n">${fmt(rs.filter(isPaid).reduce((a,r)=>a+recVal(r),0))}</td><td><span class="pill ${st.k}">${st.t}</span></td></tr>`}).concat(list.length?[sumRow(8,{5:fmt(list.reduce((a,i)=>a+(+i.total||0),0)),6:fmt(list.reduce((a,i)=>a+recsOf(i).filter(isPaid).reduce((x,r)=>x+recVal(r),0),0))},`Total do filtro · ${list.length} fatura${list.length===1?'':'s'}`)]:[]),'Nenhuma fatura emitida.');
   }else{
     const by={};ub.forEach(o=>(by[o.client]=by[o.client]||[]).push(o));const ent=Object.entries(by);
     body=`<p class="note">Todo trabalho finalizado entra aqui na hora. Clientes com fatura por entrega já recebem a fatura automaticamente. Os de fechamento mensal ficam aqui até você gerar a fatura, escolhendo forma de pagamento, parcelas e vencimentos.</p>`+
@@ -1283,7 +1287,7 @@ V.pagar=()=>{
   ${sel('ui-payGrp',[['','Todos os grupos'],...grps.map(g=>[g,GROUPS[g][0]])],UI.payGrp,'data-ui="payGrp" aria-label="Grupo" style="width:auto"')}
   <input type="search" id="payq" data-q="payQ" placeholder="Buscar descrição, categoria ou fornecedor…" value="${esc(UI.payQ||'')}" aria-label="Buscar" style="flex:1;min-width:200px"></div>`+catBar('pay',S.payables.map(p=>accOf(p.acct)),S.payables.map(p=>p.method))+(UI.payView==='cat'?catSummary('pay',list,p=>accOf(p.acct),p=>p.status==='pago'?payOut(p):p.amount):
   tbl(['Descrição','Categoria','Subcategoria','Fornecedor','Forma','Competência','Vencimento','#Valor',''],list.map(p=>{const a=accOf(p.acct);return`<tr><td>${esc(p.desc)}${p.note?`<div class="mut" style="font-size:12px">${esc(p.note)}</div>`:''}</td>${catCells(a)}<td class="mut">${esc(supOf(p.sup).name||'—')}</td><td class="mut">${esc(p.method||'—')}</td><td class="mono">${monthShort(payComp(p))}</td><td>${finPill(p)}</td><td class="n">${fmt(p.amount)}</td>
-  <td class="n" style="white-space:nowrap">${p.status!=='pago'?`<button class="btn sm primary" data-act="pay-pay" data-id="${p.id}">Pagar</button> <button class="btn sm ghost" data-act="ent-form" data-k="payables" data-id="${p.id}">Editar</button>`:`<button class="btn sm ghost" data-act="ent-form" data-k="payables" data-id="${p.id}">Editar</button> <button class="btn sm ghost" data-act="fin-undo" data-k="payables" data-id="${p.id}" data-confirm="Confirmar estorno">Estornar</button>`}</td></tr>`}),UI.payTab==='pagas'?'Nenhum pagamento registrado.':'Nenhuma conta em aberto.'))+
+  <td class="n" style="white-space:nowrap">${p.status!=='pago'?`<button class="btn sm primary" data-act="pay-pay" data-id="${p.id}">Pagar</button> <button class="btn sm ghost" data-act="ent-form" data-k="payables" data-id="${p.id}">Editar</button>`:`<button class="btn sm ghost" data-act="ent-form" data-k="payables" data-id="${p.id}">Editar</button> <button class="btn sm ghost" data-act="fin-undo" data-k="payables" data-id="${p.id}" data-confirm="Confirmar estorno">Estornar</button>`}</td></tr>`}).concat(list.length?[sumRow(9,{7:fmt(tot)},`Total do filtro · ${list.length} conta${list.length===1?'':'s'}${UI.payTab==='pagas'&&Math.abs(list.reduce((a,p)=>a+payOut(p),0)-tot)>=0.01?' · saiu do caixa (com juros e descontos) '+fmt(list.reduce((a,p)=>a+payOut(p),0)):''}`)]:[]),UI.payTab==='pagas'?'Nenhum pagamento registrado.':'Nenhuma conta em aberto.'))+
   `<p class="mut" style="font-size:12.5px;margin-top:8px">${list.length} conta${list.length===1?'':'s'} · ${fmt(tot)} · ${perTxt(pk)}</p>`;
 };
 
@@ -1344,8 +1348,8 @@ window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{S=J
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)liveRefresh()});
 setInterval(()=>{const d=addDays(0);if(d!==finDay){finDay=d;liveRefresh()}else if(view==='painel'){const u=document.getElementById('fin-upd');if(u&&!modalOpen())liveRefresh()}},60000);
 /* ---------- projeção ---------- */
-function cashForecast(days,gran,incLate,incUnb,incRec){const t0=addDays(0),end=addDays(days),items=[];
-S.receivables.filter(r=>!isPaid(r)).forEach(r=>{const late=r.due<t0;if(late&&!incLate)return;if(r.due>end)return;const inv=invOf(r);items.push({type:'rec',id:r.id,date:late?t0:r.due,orig:r.due,late,amount:r2(r.amount-feeFor(r.method,r.amount)),desc:(r.client?cliOf(r.client).name+' · ':'')+(inv?'Fatura '+pad4(inv.num)+' '+(r.parcel||''):r.desc),method:r.method})});
+function cashForecast(days,gran,incLate,incUnb,incRec,keep){const t0=addDays(0),end=addDays(days),items=[];
+S.receivables.filter(r=>!isPaid(r)).forEach(r=>{const late=r.due<t0;if(late&&!incLate)return;if(r.due>end)return;const inv=invOf(r);items.push({type:'rec',id:r.id,date:late?t0:r.due,orig:r.due,late,amount:r2(r.amount-feeFor(r.method,r.amount)),gross:r2(r.amount),desc:(r.client?cliOf(r.client).name+' · ':'')+(inv?'Fatura '+pad4(inv.num)+' '+(r.parcel||''):r.desc),method:r.method})});
 S.payables.filter(p=>p.status!=='pago').forEach(p=>{const late=p.due<t0;if(late&&!incLate)return;if(p.due>end)return;items.push({type:'pay',id:p.id,date:late?t0:p.due,orig:p.due,late,amount:-p.amount,desc:p.desc,method:p.method})});
 if(incUnb){const by={};unbilled().forEach(o=>{const c=cliOf(o.client);(by[c.id]=by[c.id]||{c,v:0,n:0});by[c.id].v+=osTotal(o);by[c.id].n++});
 Object.values(by).forEach(({c,v,n})=>{const base=c.term==='mensal'?lastDay(monthKey(0)):t0,date=addFrom(base,+c.dueDays||0);if(date<=end&&v>0)items.push({type:'unb',id:c.id,date:date<t0?t0:date,amount:r2(v),desc:`${c.name} · ${n} trabalho${n>1?'s':''} a faturar (previsão)`})})}
@@ -1354,6 +1358,7 @@ for(let i=0;i<=Math.ceil(days/28)+1;i++){const k=monthKey(i);
 if(!S.posted.fix.includes(k))S.fixed.forEach(f=>{const d=dayIn(k,+f.day||10);if(d>=t0&&d<=end&&+f.value>0)items.push({type:'fix',id:f.id,date:d,amount:-(+f.value),desc:f.name+' (custo fixo previsto)'})});
 const hasFolha=S.payables.some(p=>payComp(p)===k&&accOf(p.acct)?.cat.name==='Pessoal'),[y,m]=k.split('-').map(Number),d5=iso(new Date(y,m,5));
 if(folha>0&&!hasFolha&&d5>=t0&&d5<=end)items.push({type:'fix',id:'folha',date:d5,amount:-folha,desc:'Folha e pró-labore de '+monthShort(k)+' (previsto pela equipe)'})}}
+if(keep){const k2=items.filter(keep);items.length=0;items.push(...k2)}
 items.sort((a,b)=>a.date.localeCompare(b.date));
 const bk=d=>{if(gran==='mes')return d.slice(0,7);if(gran==='semana'){const x=pd(d),w=(x.getDay()+6)%7;x.setDate(x.getDate()-w);return iso(x)}return d};
 const start=totalBalance(t0),rows=[];let bal=start,minB=start,minD=t0;
@@ -1451,14 +1456,15 @@ const pend=S.bankLines.filter(l=>l.status==='pendente').length;
 const acts='<button class="btn" data-act="cx-new-mov" data-k="entrada">+ Entrada</button><button class="btn" data-act="cx-new-mov" data-k="saida">+ Saída</button><button class="btn" data-act="cx-new-mov" data-k="transfer">Transferência</button>';
 let body='';
 if(UI.cxTab==='visao'){
-const cxD=(UI.cxDe&&UI.cxDe>t0)?UI.cxDe:t0,cxA=(UI.cxAte&&UI.cxAte>=t0)?UI.cxAte:addDays(30),cxN=Math.max(0,Math.round((pd(cxA)-pd(t0))/864e5)),cxT='de '+dmy(cxD)+' a '+dmy(cxA);
-const F0=cashForecast(cxN,UI.cxGran,UI.cxLate==='1',UI.cxUnb==='1',UI.cxRec==='1'),F={...F0,items:F0.items.filter(x=>x.late||x.date>=cxD),rows:F0.rows.filter(r=>UI.cxGran!=='dia'||r.k>=cxD)};F.inn=r2(F.items.filter(x=>x.amount>0).reduce((a,x)=>a+x.amount,0));F.out=r2(-F.items.filter(x=>x.amount<0).reduce((a,x)=>a+x.amount,0));
-const late=F.items.filter(x=>x.late),gl=k=>UI.cxGran==='mes'?monthShort(k):UI.cxGran==='semana'?'Semana de '+dm(k):(k===t0?'Hoje':dm(k)+' · '+['dom','seg','ter','qua','qui','sex','sáb'][pd(k).getDay()]);
+const pDe=UI.cxDe||'',pAte=UI.cxAte||'',cxD=(pDe&&pDe>t0)?pDe:t0,cxA=pAte?(pAte<t0?t0:pAte):addDays(30),cxN=Math.max(0,Math.round((pd(cxA)-pd(t0))/864e5)),pastDe=!!(pDe&&pDe<t0),cxT=(pDe?'de '+dmy(pDe):'até')+(pDe?' a ':' ')+dmy(cxA);
+const oldOk=x=>pastDe?(x.orig>=pDe||UI.cxLate==='1'):UI.cxLate==='1',F0=cashForecast(cxN,UI.cxGran,true,UI.cxUnb==='1',UI.cxRec==='1',x=>!x.late||oldOk(x)),F={...F0,items:F0.items.filter(x=>x.late||x.date>=cxD),rows:F0.rows.filter(r=>UI.cxGran!=='dia'||r.k>=cxD)};
+const lateAll=cashForecast(0,'dia',true,false,false).items.filter(x=>x.late&&(!pastDe||x.orig<pDe)),cxCmp=cxCompose(F.items,pDe,cxA,pastDe);F.inn=r2(F.items.filter(x=>x.amount>0).reduce((a,x)=>a+x.amount,0));F.out=r2(-F.items.filter(x=>x.amount<0).reduce((a,x)=>a+x.amount,0));
+const late=lateAll,gl=k=>UI.cxGran==='mes'?monthShort(k):UI.cxGran==='semana'?'Semana de '+dm(k):(k===t0?'Hoje':dm(k)+' · '+['dom','seg','ter','qua','qui','sex','sáb'][pd(k).getDay()]);
 const k3=monthsBack(4).slice(0,4).reverse(),real=k3.map(k=>{const ms=movs.filter(m=>m.date.startsWith(k)&&m.kind!=='transfer');return{k,inn:ms.filter(m=>m.amount>0).reduce((a,m)=>a+m.amount,0),out:-ms.filter(m=>m.amount<0).reduce((a,m)=>a+m.amount,0)}});
 body=`<div class="kpis">${kpi('Saldo hoje',fmt(bal),accs.map(a=>`${esc(a.name)} ${fmt(accBalance(a.id,t0,movs))}`).join(' · '),bal<0?'alert':'')}${kpi('Entradas previstas',fmt(F.inn),cxT)}${kpi('Saídas previstas',fmt(F.out),cxT)}${kpi('Saldo projetado',fmt(F.end),'em '+dmy(cxA),F.end<0?'alert':'good')}${kpi('Menor saldo no período',fmt(F.minB),F.minB<0?'caixa negativo em '+(UI.cxGran==='dia'?dmy(F.minD):gl(F.minD)):'sem aperto previsto',F.minB<0?'alert':'')}</div>
 <div class="toolbar">${perBar('cx','Período',{min:t0})}${seg('cxGran',[['dia','Por dia'],['semana','Por semana'],['mes','Por mês']])}
-<label class="checks"><input type="checkbox" data-act2c="cxLate" ${UI.cxLate==='1'?'checked':''}> Incluir vencidos (${late.length})</label><label class="checks"><input type="checkbox" data-act2c="cxUnb" ${UI.cxUnb==='1'?'checked':''}> Incluir trabalhos a faturar</label><label class="checks"><input type="checkbox" data-act2c="cxRec" ${UI.cxRec==='1'?'checked':''}> Incluir custos fixos e folha ainda não lançados</label></div>
-<section class="panel" style="margin-bottom:16px">${cxChart(F.rows)}</section>`+
+<label class="checks"><input type="checkbox" data-act2c="cxLate" ${UI.cxLate==='1'?'checked':''}> Incluir vencidos ${pastDe?'antes de '+dm(pDe)+' ':''}(${late.length})</label><label class="checks"><input type="checkbox" data-act2c="cxUnb" ${UI.cxUnb==='1'?'checked':''}> Incluir trabalhos a faturar</label><label class="checks"><input type="checkbox" data-act2c="cxRec" ${UI.cxRec==='1'?'checked':''}> Incluir custos fixos e folha ainda não lançados</label></div>
+${pAte&&pAte<t0?`<p class="note" style="margin:0 0 12px">O período termina antes de hoje. A projeção olha para frente, então mostra só o que está vencido e ainda não foi pago. O que já entrou e saiu está em <b>Extrato por conta</b>.</p>`:''}${cxCmp}<section class="panel" style="margin-bottom:16px">${cxChart(F.rows)}</section>`+
 tbl(['Período','#Entradas','#Saídas','#Resultado','#Saldo acumulado'],[`<tr class="sum"><td>Saldo de hoje</td><td></td><td></td><td></td><td class="n">${fmt(F.start)}</td></tr>`,...F.rows.filter(r=>r.n||UI.cxGran!=='dia').map(r=>`<tr><td>${gl(r.k)}</td><td class="n pos">${r.inn?fmt(r.inn):'—'}</td><td class="n neg">${r.out?fmt(r.out):'—'}</td><td class="n ${r.inn-r.out<0?'neg':''}">${fmt(r.inn-r.out)}</td><td class="n ${r.bal<0?'neg':''}"><b style="font-weight:600">${fmt(r.bal)}</b></td></tr>`)])+
 `<h2 style="margin-top:22px">Compromissos do período</h2><p class="sub" style="margin:-6px 0 10px">Dê baixa, receba ou reprograme direto daqui. Recebimentos aparecem pelo valor líquido previsto (já sem a taxa da forma de pagamento).</p>`+
 tbl(['Data','Descrição','Forma','#Valor',''],F.items.map(x=>`<tr><td class="mono">${dm(x.date)}${x.late?` <span class="pill late">venceu ${dm(x.orig)}</span>`:''}</td><td>${esc(x.desc)}</td><td class="mut">${esc(x.method||'')}</td><td class="n ${x.amount<0?'neg':'pos'}">${fmt(x.amount)}</td><td class="n" style="white-space:nowrap">${x.type==='rec'?`<button class="btn sm primary" data-act="rec-pay" data-id="${x.id}">Receber</button> <button class="btn sm ghost" data-act="cx-resch" data-k="rec" data-id="${x.id}">Reprogramar</button>`:x.type==='pay'?`<button class="btn sm primary" data-act="pp-open" data-id="${x.id}">Pagar</button> <button class="btn sm ghost" data-act="cx-resch" data-k="pay" data-id="${x.id}">Reprogramar</button>`:x.type==='unb'?`<button class="btn sm" data-act="inv-new" data-id="${x.id}">Faturar</button>`:'<span class="mut" style="font-size:12px">previsão</span>'}</td></tr>`),'Nada previsto no período.')+
@@ -1466,9 +1472,10 @@ tbl(['Data','Descrição','Forma','#Valor',''],F.items.map(x=>`<tr><td class="mo
 }else if(UI.cxTab==='extrato'){
 const a=S.accounts.find(x=>x.id===UI.cxAcc),pe=perGet('cxe'),from=pe.de||a.openDate||'2000-01-01',to=pe.ate||addDays(0),ini=accBalance(a.id,addFrom(from,-1),movs);
 const list=movs.filter(m=>m.account===a.id&&m.date>=from&&m.date<=to&&m.date>=(a.openDate||''));let b=ini;
+const preOpen=movs.filter(m=>m.account===a.id&&a.openDate&&m.date<a.openDate&&m.date>=from&&m.date<=to),allP=movs.filter(m=>m.kind!=='transfer'&&m.date>=from&&m.date<=to&&cashAccs().some(c=>c.id===m.account&&m.date>=(c.openDate||''))),allIn=allP.filter(m=>m.amount>0).reduce((t,m)=>t+m.amount,0),allOut=-allP.filter(m=>m.amount<0).reduce((t,m)=>t+m.amount,0);
 const inn=list.filter(m=>m.amount>0).reduce((s,m)=>s+m.amount,0),out=-list.filter(m=>m.amount<0).reduce((s,m)=>s+m.amount,0);
 body=`<div class="toolbar">${sel('ui-cxAcc',accs.map(x=>[x.id,x.name]),UI.cxAcc,'data-ui="cxAcc" aria-label="Conta" style="width:auto"')}${perBar('cxe','Período')}<button class="btn" data-act="cx-new-mov" data-k="ajuste">Ajuste de saldo</button></div>${catBar('cx',list.map(movAcc),list.map(m=>m.method))}
-<div class="kpis">${kpi('Saldo inicial',fmt(ini),'em '+dmy(addFrom(from,-1)))}${kpi('Entradas',fmt(inn),list.filter(m=>m.amount>0).length+' movimentos')}${kpi('Saídas',fmt(out),list.filter(m=>m.amount<0).length+' movimentos')}${kpi('Saldo final',fmt(ini+inn-out),to>=addDays(0)?'até hoje':'em '+dmy(to),ini+inn-out<0?'alert':'')}${kpi('Conferidos',`${list.filter(m=>m.ok||m.recon).length} de ${list.length}`,'marcados ou conciliados')}</div>`+
+${preOpen.length?`<p class="note" style="margin:0 0 12px;background:var(--late-soft);color:var(--late)">${preOpen.length} movimento${preOpen.length>1?'s':''} desta conta no período ${preOpen.length>1?'são':'é'} de antes da abertura da conta (${dmy(a.openDate)}) e não ${preOpen.length>1?'entram':'entra'} no extrato nem no saldo (${fmt(preOpen.reduce((t,m)=>t+m.amount,0))}). Se a conta já existia, mude a data de abertura em Fluxo de caixa › Contas.</p>`:''}${cashAccs().length>1?`<p class="mut" style="font-size:12.5px;margin:0 0 10px">Em todas as contas no período: entradas ${fmt(allIn)} · saídas ${fmt(allOut)} (recebimentos pelo valor líquido, já sem taxas; pagamentos com juros e descontos).</p>`:''}<div class="kpis">${kpi('Saldo inicial',fmt(ini),'em '+dmy(addFrom(from,-1)))}${kpi('Entradas',fmt(inn),list.filter(m=>m.amount>0).length+' movimentos')}${kpi('Saídas',fmt(out),list.filter(m=>m.amount<0).length+' movimentos')}${kpi('Saldo final',fmt(ini+inn-out),to>=addDays(0)?'até hoje':'em '+dmy(to),ini+inn-out<0?'alert':'')}${kpi('Conferidos',`${list.filter(m=>m.ok||m.recon).length} de ${list.length}`,'marcados ou conciliados')}</div>`+
 (UI.cxView==='cat'?catSummary('cx',list.filter(m=>catOk('cx',movAcc(m))&&metOk('cx',m.method)),movAcc,m=>m.amount,'io'):tbl(['Data','Descrição','Categoria','Subcategoria','Forma','#Entrada','#Saída','#Saldo','Conferido',''],[`<tr class="sum"><td colspan="7">Saldo anterior</td><td class="n">${fmt(ini)}</td><td colspan="2"></td></tr>`,...list.map(m=>{b+=m.amount;if(!catOk('cx',movAcc(m))||!metOk('cx',m.method))return'';return`<tr><td class="mono">${dm(m.date)}</td><td>${esc(m.desc)}</td>${catCells(movAcc(m))}<td class="mut">${esc(m.method||'')}</td><td class="n pos">${m.amount>0?fmt(m.amount):''}</td><td class="n neg">${m.amount<0?fmt(-m.amount):''}</td><td class="n ${b<0?'neg':''}">${fmt(b)}</td>
 <td>${m.recon?'<span class="pill ok">Conciliado</span>':`<label class="checks"><input type="checkbox" data-cxok="${m.key}" ${m.ok?'checked':''} aria-label="Conferido"> ok</label>`}</td><td class="n" style="white-space:nowrap">${m.type==='cash'?`<button class="btn sm ghost" data-act="cx-del" data-id="${m.id}" data-confirm="Confirmar exclusão">Excluir</button>`:`<button class="btn sm ghost" data-act="fin-undo" data-k="${m.type==='rec'?'receivables':'payables'}" data-id="${m.id}" data-confirm="Confirmar estorno">Estornar</button>`}</td></tr>`})],'Nenhum movimento no período.'));
 }else if(UI.cxTab==='conciliacao'){
@@ -2637,7 +2644,7 @@ function genDemo(){
     const done=!cancel&&(dueOff<=-1||(dueOff===0&&rnd()<.5));let idx,delOff=null;
     if(done){delOff=Math.min(-1,dueOff+pick([-1,0,0,0,1,2]));idx=s.stages.length}else{const pr=Math.max(0,Math.min(.92,(0-cOff)/Math.max(1,dueOff-cOff)));idx=Math.floor(pr*s.stages.length)}
     const endOff=done?delOff:0,history=[];
-    for(let k=0;k<idx;k++){const st=s.stages[k];history.push({stage:st,tech:techFor(st),at:addDays(cOff+Math.round((endOff-cOff)*(k+1)/(idx+1))),rate:+s.rates[st]||0,elements:qty})}
+    for(let k=0;k<idx;k++){const st=s.stages[k];{const tk=techFor(st);history.push({stage:st,tech:tk,at:addDays(cOff+Math.round((endOff-cOff)*(k+1)/(idx+1))),rate:rateFor(s,st,tk),elements:qty})}}
     const num=S.seq++,mc=r2(matCostSvc(s)*qty);
     if(!cancel)consume(s,qty,cOff,num);
     const status=cancel?'cancelado':done?'entregue':'producao';
@@ -2868,7 +2875,7 @@ function makeKids(o){const cl=cliOf(o.client);(draft.extras||[]).forEach((e,i)=>
   x.s.bom.forEach(b=>S.moves.push({id:uid('mv'),mat:b.mat,type:'saida',qty:r2(b.qty*x.n),date:o.created,ref:'OS '+o.num,kid:kid.id,cost:matOf(b.mat).cost}));S.orders.push(kid)})}
 function advance(id){
   const o=S.orders.find(x=>x.id===id),svc=svcOf(o),st=curStage(o);if(!st)return;
-  o.history.push({stage:st,tech:defaultTech(o,st),at:addDays(0),rate:o.remake?0:(+svc.rates[st]||0),elements:q(o)});
+  {const tk=defaultTech(o,st);o.history.push({stage:st,tech:tk,at:addDays(0),rate:o.remake?0:rateFor(svc,st,tk),elements:q(o)})}
   o.idx++;skipFwd(o);const sd=stageDeliver(o,st,o.idx>=svc.stages.length);
   if(o.idx>=svc.stages.length){
     o.status='entregue';o.delivered=addDays(0);const cl=cliOf(o.client);kidsOf(o).forEach(k=>{if(k.status==='acompanha'){k.status='entregue';k.delivered=o.delivered}});
@@ -4727,6 +4734,64 @@ body.modal-open .scan-fab{display:none!important}`;document.head.appendChild(st)
 {const b=document.createElement('button');b.type='button';b.className='scan-fab';b.dataset.act='scan';b.setAttribute('aria-label','Ler QR da OS');b.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 12h8"/></svg>Ler QR';document.body.appendChild(b)}
 /* esconde o botão fixo quando há uma janela aberta */
 {const m=document.getElementById('modal');if(m){const sync=()=>document.body.classList.toggle('modal-open',!m.hidden);new MutationObserver(sync).observe(m,{attributes:true,attributeFilter:['hidden']});sync()}}
+
+/* Comissão por colaborador: em cada serviço, uma tabela com o valor de cada pessoa da produção em cada etapa.
+   Campo vazio = vale o valor padrão da etapa. O valor é gravado na etapa concluída (rateFor). */
+const rbTeam=s=>S.team.filter(t=>t.active!==false&&(t.stages||[]).some(x=>(s.stages||[]).includes(x)));
+const rbTot=(s,t)=>r2((s.stages||[]).filter(x=>(t.stages||[]).includes(x)).reduce((a,x)=>a+rateFor(s,x,t.id),0));
+function rbHtml(s){const T=rbTeam(s),ul=(UNITL[s.unit||'elemento']||['elemento'])[0];
+  if(!(s.stages||[]).length)return'';
+  if(!T.length)return`<div id="rb-box" style="margin-top:12px"><p class="mut" style="font-size:12.5px;margin:0">Comissão por colaborador: nenhum profissional ativo faz estas etapas. Marque as etapas de cada pessoa em Equipe.</p></div>`;
+  const diff=t=>(s.stages||[]).some(x=>s.rateBy&&s.rateBy[t.id]&&s.rateBy[t.id][x]!=null&&s.rateBy[t.id][x]!=='');
+  return`<div id="rb-box" style="margin-top:14px"><div class="sec-h"><span class="lbl">Comissão por colaborador (R$ por ${ul})</span><span class="mut" style="font-size:12px">vazio = valor padrão da etapa</span></div>
+  <div style="overflow-x:auto;margin-top:6px"><table class="tbl rb-tbl"><thead><tr><th>Colaborador</th>${s.stages.map(x=>`<th class="num">${esc(SN[x]||x)}</th>`).join('')}<th class="num">Total por ${ul}</th></tr></thead><tbody>
+  ${T.map(t=>`<tr data-rbrow="${t.id}"><td style="min-width:150px">${esc(t.name)}${diff(t)?' <span class="chip">próprio</span>':''}</td>${s.stages.map(x=>(t.stages||[]).includes(x)?`<td class="num"><input type="number" min="0" step="0.01" style="width:82px;text-align:right" data-rb="${t.id}" data-st="${x}" value="${s.rateBy&&s.rateBy[t.id]&&s.rateBy[t.id][x]!=null?esc(String(s.rateBy[t.id][x])):''}" placeholder="${+((s.rates||{})[x])||0}" aria-label="${esc(t.name)} · ${esc(SN[x]||x)}"></td>`:'<td class="num mut">—</td>').join('')}<td class="num"><b data-rbtot="${t.id}">${fmt(rbTot(s,t))}</b></td></tr>`).join('')}
+  </tbody></table></div></div>`}
+{const _rs=renderSvc;window.renderSvc=renderSvc=function(...a){const r=_rs(...a);try{const s=svcDraft;if(!s)return r;const old=document.getElementById('rb-box');if(old)old.remove();
+  const one=document.querySelector('#modal [data-sd="rate"]');const g=one&&one.closest('.form-grid');if(g)g.insertAdjacentHTML('afterend',rbHtml(s))}catch(e){console.error(e)}return r}}
+document.addEventListener('input',e=>{const t=e.target;if(!t||!t.dataset||!('rb' in t.dataset)||!svcDraft)return;const s=svcDraft,id=t.dataset.rb,st=t.dataset.st,v=t.value.trim();
+  s.rateBy=s.rateBy||{};if(v===''){if(s.rateBy[id]){delete s.rateBy[id][st];if(!Object.keys(s.rateBy[id]).length)delete s.rateBy[id]}}else{(s.rateBy[id]=s.rateBy[id]||{})[st]=r2(Math.max(0,+v||0))}
+  const tm=S.team.find(x=>x.id===id),b=document.querySelector(`[data-rbtot="${id}"]`);if(tm&&b)b.textContent=fmt(rbTot(s,tm))});
+/* limpa valores de etapas que saíram do serviço */
+{const clean=s=>{if(!s||!s.rateBy)return;Object.keys(s.rateBy).forEach(id=>{Object.keys(s.rateBy[id]).forEach(k=>{if(!(s.stages||[]).includes(k))delete s.rateBy[id][k]});if(!Object.keys(s.rateBy[id]).length)delete s.rateBy[id]})};
+  document.addEventListener('submit',e=>{if(svcDraft&&e.target&&e.target.id==='svcForm')clean(svcDraft)},true)}
+/* corrigir comissão: trocar o profissional traz o valor dele */
+document.addEventListener('change',e=>{const t=e.target;if(!t||t.id!=='cf-tech')return;const f=t.closest('#cmfixForm');if(!f)return;const o=S.orders.find(x=>x.id===f.dataset.id),h=o&&o.history[+f.dataset.hi];if(!h)return;
+  const r=document.getElementById('cf-rate');if(!r)return;r.value=o.remake?0:rateFor(svcOf(o),h.stage,t.value);r.dispatchEvent(new Event('input',{bubbles:true}))});
+
+/* Fluxo de caixa › Projeção: de onde vêm as entradas e saídas previstas, com o valor que bate com
+   Contas a receber › A receber e Contas a pagar › Em aberto no mesmo período, e botões para conferir lá. */
+function cxCompose(items,pDe,cxA,pastDe){
+  const inP=x=>(!pDe||x.orig>=pDe)&&x.orig<=cxA,old=x=>pDe&&x.orig<pDe,S2=(a,f)=>r2(a.reduce((t,x)=>t+f(x),0));
+  const rec=items.filter(x=>x.type==='rec'),pay=items.filter(x=>x.type==='pay');
+  const recEq=S2(S.receivables.filter(r=>!isPaid(r)&&(!pDe||r.due>=pDe)&&r.due<=cxA),r=>+r.amount||0),payEq=S2(S.payables.filter(p=>p.status!=='pago'&&(!pDe||p.due>=pDe)&&p.due<=cxA),p=>+p.amount||0);
+  const recIn=S2(rec.filter(inP),x=>x.gross),recOld=S2(rec.filter(old),x=>x.gross),fees=S2(rec,x=>x.gross-x.amount),unb=S2(items.filter(x=>x.type==='unb'),x=>x.amount);
+  const payIn=S2(pay.filter(inP),x=>-x.amount),payOld=S2(pay.filter(old),x=>-x.amount),fix=S2(items.filter(x=>x.type==='fix'),x=>-x.amount);
+  const inn=S2(items.filter(x=>x.amount>0),x=>x.amount),out=S2(items.filter(x=>x.amount<0),x=>-x.amount);
+  const per=pDe?`de ${dmy(pDe)} a ${dmy(cxA)}`:`até ${dmy(cxA)}`;
+  const L=(t,v,sign,cls)=>v?`<tr${cls?` class="${cls}"`:''}><td>${t}</td><td class="n">${sign}${fmt(Math.abs(v))}</td></tr>`:'';
+  const tb=(rows,tot,lbl)=>`<table><tbody>${rows}<tr class="sum"><td>${lbl}</td><td class="n">${fmt(tot)}</td></tr></tbody></table>`;
+  return`<details class="panel cx-cmp" style="margin-bottom:16px" ${UI.cxCmpOpen?'open':''}><summary style="cursor:pointer;font-weight:600">De onde vêm as entradas e saídas previstas</summary>
+  <p class="mut" style="font-size:12.5px;margin:8px 0 10px">A primeira linha de cada lado é o mesmo valor de Contas a receber › A receber e de Contas a pagar › Em aberto filtrados ${per}. O resto é o que a projeção soma ou tira.</p>
+  <div class="cols">
+  <div><h3 style="margin:0 0 6px;font-size:14px">Entradas</h3>${tb(
+    L(`Contas a receber em aberto, vencimento ${per}`,recEq,'','')+
+    L('Vencidos antes do período (opção "Incluir vencidos")',recOld,'+ ')+
+    L('Vencidos fora da projeção (opção "Incluir vencidos" desmarcada)',r2(recEq-recIn),'− ')+
+    L('Taxas previstas das formas de pagamento (cartão, boleto…)',fees,'− ')+
+    L('Trabalhos entregues ainda não faturados (previsão)',unb,'+ '),inn,'Entradas previstas')}
+    <button class="btn sm" data-cxgo="rec" data-de="${pDe}" data-ate="${cxA}" style="margin-top:8px">Conferir em Contas a receber</button></div>
+  <div><h3 style="margin:0 0 6px;font-size:14px">Saídas</h3>${tb(
+    L(`Contas a pagar em aberto, vencimento ${per}`,payEq,'','')+
+    L('Vencidas antes do período (opção "Incluir vencidos")',payOld,'+ ')+
+    L('Vencidas fora da projeção (opção "Incluir vencidos" desmarcada)',r2(payEq-payIn),'− ')+
+    L('Custos fixos e folha ainda não lançados (previsão)',fix,'+ '),out,'Saídas previstas')}
+    <button class="btn sm" data-cxgo="pay" data-de="${pDe}" data-ate="${cxA}" style="margin-top:8px">Conferir em Contas a pagar</button></div>
+  </div></details>`}
+document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.classList&&d.classList.contains('cx-cmp'))UI.cxCmpOpen=d.open},true);
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-cxgo]');if(!b)return;e.preventDefault();const k=b.dataset.cxgo;
+  if(k==='rec'){UI.recDe=b.dataset.de||'';UI.recAte=b.dataset.ate||'';UI.recTab='aberto';UI.recQ='';view='receber'}else{UI.payDe=b.dataset.de||'';UI.payAte=b.dataset.ate||'';UI.payTab='aberto';UI.payQ='';UI.payGrp='';view='pagar'}
+  try{location.hash=view}catch(x){}render();toast('Mesmo período: '+perTxt(k==='rec'?'rec':'pay'))});
 
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
