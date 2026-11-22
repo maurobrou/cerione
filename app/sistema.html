@@ -300,10 +300,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 
 <div class="app">
   <aside class="side">
-    <div class="brand"><span class="logo"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="cer-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7FF3EA"/><stop offset=".55" stop-color="#2BBFB4"/><stop offset="1" stop-color="#D9B872"/></linearGradient></defs><path d="M16 2 28 9v14l-12 7L4 23V9z" fill="none" stroke="url(#cer-g)" stroke-width="2"/><path d="M16 2v28M4 9l24 14M28 9 4 23" stroke="url(#cer-g)" stroke-width="1" opacity=".55"/><circle cx="16" cy="16" r="3.2" fill="url(#cer-g)"/></svg>CERIONE</span><span class="tenant" id="tenant">Estúdio Dental</span></div>
+    <div class="brand"><span class="logo"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="cer-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7FF3EA"/><stop offset=".55" stop-color="#2BBFB4"/><stop offset="1" stop-color="#D9B872"/></linearGradient></defs><path d="M16 2 28 9v14l-12 7L4 23V9z" fill="none" stroke="url(#cer-g)" stroke-width="2"/><path d="M16 2v28M4 9l24 14M28 9 4 23" stroke="url(#cer-g)" stroke-width="1" opacity=".55"/><circle cx="16" cy="16" r="3.2" fill="url(#cer-g)"/></svg>CERIONE</span><span class="tenant" id="tenant"></span></div>
     <div class="side-act"><button class="btn primary sm" data-act="new">+ Novo trabalho</button><button class="btn sm scan-btn" data-act="scan" title="Ler QR da OS (leitor, câmera ou número)">Ler QR da OS</button><button class="jmp-btn" data-act="jump" title="Busca rápida (Ctrl+K)"><span>Buscar…</span><kbd>Ctrl K</kbd></button></div>
     <nav class="nav" id="nav" aria-label="Módulos"></nav>
-    <div class="side-foot"><span>Protótipo · dados salvos só neste navegador.</span></div>
+    <div class="side-foot"></div>
   </aside>
   <main id="main"></main>
 </div>
@@ -1039,7 +1039,7 @@ function onboarding(){
     ['fornecedores','Cadastre seus fornecedores',S.suppliers.length>0],
     ['estoque','Revise o custo dos materiais e lance o estoque atual (Entrada / ajuste)',S.moves.some(m=>m.type!=='saida')],
     ['equipe','Cadastre a equipe e as etapas de cada um',S.team.length>0],
-    ['servicos',S.services.length&&!S.services.some(x=>+x.price>0)?'Coloque o seu preço em cada serviço (as fichas técnicas já vêm prontas como modelo)':'Revise as fichas técnicas, preços e o status de margem de cada serviço',S.services.some(x=>+x.price>0)],
+    ['servicos',(()=>{const np=actv('services').filter(x=>!(+x.price>0)&&!x.billByStage).length;return np?`Coloque o seu preço nos serviços (${np} ainda sem preço; as fichas técnicas já vêm prontas como modelo). Você também pode digitar o preço ao criar a OS`:'Revise as fichas técnicas, preços e o status de margem de cada serviço'})(),actv('services').filter(x=>!(+x.price>0)&&!x.billByStage).length<=actv('services').length/2],
     ['clientes','Cadastre os dentistas e clínicas',S.clients.length>0],
     ['trabalhos','Crie o primeiro trabalho e leve-o até a entrega',S.orders.length>0]];
   const done=steps.filter(x=>x[2]).length;
@@ -2202,7 +2202,7 @@ function renderNewOrder(err=''){
   <div class="form-grid">${fld('no-cli','Cliente',sel('no-cli',S.clients.filter(c=>c.active!==false||c.id===draft.client).map(c=>[c.id,c.name+(cliOwn(c)?' (tabela própria)':c.discount?` (−${c.discount}%)`:'')]),draft.client,'data-d="client"'))}${fld('no-pac','Paciente (nome ou iniciais)',inp('no-pac',draft.patient,'text',`data-d="patient" placeholder="Ex.: M.A.S." ${S.settings.privIni!==false?'title="Por privacidade (LGPD) o sistema guarda só as iniciais"':''}`))}${fld('no-box','Nº da caixa',inp('no-box',draft.boxNo||'','text','data-d="boxNo" placeholder="Ex.: 59R" maxlength="12"'))}
   ${fld('no-svc','Serviço',`<select id="no-svc" data-d="service" ${draft.lockSvc?'disabled title="O trabalho já avançou na produção"':''}>${opts}</select>`)}${fld('no-shade','Cor (escala VITA)',sel('no-shade',[...(draft.shade&&!SHADES.includes(draft.shade)?[[draft.shade,draft.shade+' (atual)']]:[]),...SHADES.map(x=>[x,x])],draft.shade,'data-d="shade"'))}${fld('no-due','Prazo de entrega',inp('no-due',draft.due,'date','data-d="due"'))}
   ${isEl&&!(draft.qtyNoTeeth&&!draft.teeth.length)?'':fld('no-qty',`Quantidade (${UNITL[svc.unit||'elemento'][1]})${isEl?' · ou marque os dentes':''}`,inp('no-qty',draft.qty,'number','min="1" step="1" data-d="qty"'))}
-  ${fld('no-price',`Valor por ${ul} (R$)`,inp('no-price',svc.billByStage?'':draft.priceTxt,'number',`${can('preco')&&!svc.billByStage?'':'disabled '}min="0" step="0.01" data-d="priceTxt" placeholder="${svc.billByStage?'por etapa: '+stgSum().toFixed(2):svc.consult&&!svc.price?'Sob consulta: informe':base.toFixed(2)}"`))}${fld('no-disc','Desconto nesta OS (R$)',inp('no-disc',draft.discTxt||'','number',(can('preco')&&!svc.billByStage?'':'disabled ')+'min="0" step="0.01" data-d="discTxt" placeholder="0,00"'))}
+  ${fld('no-price',`Valor por ${ul} (R$)`,inp('no-price',svc.billByStage?'':draft.priceTxt,'number',`${can('preco')&&!svc.billByStage?'':'disabled '}min="0" step="0.01" data-d="priceTxt" placeholder="${svc.billByStage?'por etapa: '+stgSum().toFixed(2):!(+svc.price>0)?(svc.consult?'Sob consulta: informe':'Digite o valor'):svc.consult&&!svc.price?'Sob consulta: informe':base.toFixed(2)}"`))}${fld('no-disc','Desconto nesta OS (R$)',inp('no-disc',draft.discTxt||'','number',(can('preco')&&!svc.billByStage?'':'disabled ')+'min="0" step="0.01" data-d="discTxt" placeholder="0,00"'))}
   <div class="field"><span class="lbl">Condições</span><div class="checks" style="padding-top:6px;flex-direction:column;gap:4px"><label><input type="checkbox" id="no-urg" data-d="urgent" ${draft.urgent?'checked':''}> Urgente sem agendamento (+${S.settings.urgency}%)</label><label><input type="checkbox" id="no-remake" data-d="remake" ${draft.remake?'checked':''}> Retrabalho (sem cobrança)</label></div></div></div>
   ${svc.billByStage?stgUI(svc,n,ul):''}${svc.notes?`<p class="note" style="margin:0">${esc(svc.notes)}</p>`:''}
   <div><span class="lbl">${isEl?`Elementos · ${n} selecionado${n===1?'':'s'} (numeração FDI)`:`Dentes envolvidos (opcional) · ${draft.teeth.length} marcado${draft.teeth.length===1?'':'s'}`}</span><div class="odo-wrap" style="margin-top:6px"><div class="odo">${odo(UPPER,false)}${odo(LOWER,true)}</div><div class="odo-legend"><span>Direito do paciente</span><span>Esquerdo do paciente</span></div></div></div>
@@ -4695,6 +4695,38 @@ function pdfPrint(){const V=__pdfV;if(!V)return;
   const u=URL.createObjectURL(new Blob([html],{type:'text/html'}));fr.src=u;fr.onload=()=>{setTimeout(()=>{try{fr.contentWindow.focus();fr.contentWindow.print()}catch(e){window.open(u,'_blank')}},150)};document.body.appendChild(fr);window.__pdfPrinted=(window.__pdfPrinted||0)+1}
 document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-pdfv]');if(!t||!__pdfV)return;e.preventDefault();
   if(t.dataset.pdfv==='print')pdfPrint();else relSave(__pdfV.fname,__pdfV.b,'application/pdf')});
+
+/* Serviço sem preço padrão: no novo trabalho a pessoa digita o valor e pode salvar como preço padrão do serviço. */
+const svcNoPrice=s=>s&&!s.billByStage&&!(+s.price>0);
+{const _r=renderNewOrder;window.renderNewOrder=renderNewOrder=function(...a){const r=_r(...a);try{const s=draft&&find('services',draft.service);if(!draft||draft.editId||draft.remake||!svcNoPrice(s)){const old=document.getElementById('no-savepx');if(old)old.remove();return r}
+  const fd=document.getElementById('no-price');const box=fd&&fd.closest('.field');if(box&&!document.getElementById('no-savepx'))box.insertAdjacentHTML('beforeend',`<div id="no-savepx" style="margin-top:6px"><p class="mut" style="font-size:12px;margin:0 0 4px">“${esc(s.name)}” ainda não tem preço padrão. Digite o valor desta OS.</p><label class="checks" style="font-size:12.5px"><input type="checkbox" data-savepx ${draft.savePx!==false?'checked':''}> Usar como preço padrão do serviço</label></div>`)}catch(e){}return r}}
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&'savepx' in t.dataset&&draft)draft.savePx=t.checked});
+{const _c=createOrder;window.createOrder=createOrder=function(...a){const s=find('services',draft&&draft.service),save=draft&&!draft.remake&&draft.savePx!==false&&svcNoPrice(s)&&+draft.priceTxt>0,v=save?r2(+draft.priceTxt):0;const o=_c(...a);
+  if(save&&s){s.price=v;s.consult=false;setTimeout(()=>toast(`OS ${o.num} criada · ${fmt(v)} agora é o preço padrão de ${s.name}`),50)}return o}}
+
+/* Celular: topo compacto (menos da metade da altura de antes) e botão "Ler QR" fixo no canto, para a bancada. */
+{const st=document.createElement('style');st.textContent=`
+.scan-fab{display:none;position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:40;align-items:center;gap:6px;padding:12px 16px;border-radius:999px;border:0;background:var(--accent);color:var(--accent-ink,#fff);font:inherit;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
+@media (max-width:639px){
+  .side{padding-block:8px;gap:6px}
+  .side .brand{gap:8px;align-items:baseline}
+  .side .brand .tenant{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45vw}
+  .side-act{gap:6px;flex-wrap:nowrap}
+  .side-act .btn{padding-block:6px;font-size:13px;white-space:nowrap}
+  .side-act .jmp-btn{flex:1;min-width:0}
+  .side-act .jmp-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cloudbar{gap:6px;font-size:11.5px;flex-wrap:nowrap;overflow:hidden}
+  .cloudbar .cb-who{display:none}
+  .cloudbar>span:last-child{flex-wrap:nowrap!important;margin-left:auto}
+  .side-foot{display:none}
+  .page-head{margin-bottom:10px}
+  .page-head .sub{display:none}
+  .scan-fab{display:flex}
+}
+body.modal-open .scan-fab{display:none!important}`;document.head.appendChild(st)}
+{const b=document.createElement('button');b.type='button';b.className='scan-fab';b.dataset.act='scan';b.setAttribute('aria-label','Ler QR da OS');b.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 12h8"/></svg>Ler QR';document.body.appendChild(b)}
+/* esconde o botão fixo quando há uma janela aberta */
+{const m=document.getElementById('modal');if(m){const sync=()=>document.body.classList.toggle('modal-open',!m.hidden);new MutationObserver(sync).observe(m,{attributes:true,attributeFilter:['hidden']});sync()}}
 
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}

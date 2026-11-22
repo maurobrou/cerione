@@ -195,7 +195,7 @@ function firstRunScreen(){return new Promise(res=>{let local=null;try{const d=JS
   screen(`<h2 style="margin:0">Primeiro acesso de ${h(C.lab.name)}</h2><p class="sub" style="margin:0">O laboratório ainda não tem dados no servidor. De onde começar?</p><div id="au-msg" class="msg" hidden></div>
   <div class="opt">${local?`<button class="btn primary" data-local="1"><span><b>Enviar os dados deste navegador</b><span style="display:block;font-weight:400;font-size:12.5px;opacity:.9">${h(countsTxt(countsOf(local)))}</span></span></button>`:''}
   <button class="btn" data-paste="1"><span><b>Colar um backup</b><span class="mut" style="display:block;font-weight:400;font-size:12.5px">Copiado em Configurações → Copiar backup, no sistema antigo</span></span></button>
-  <button class="btn" data-zero="1"><span><b>Começar do zero</b><span class="mut" style="display:block;font-weight:400;font-size:12.5px">Com as fichas técnicas e a tabela de preços já carregadas</span></span></button></div>
+  <button class="btn" data-zero="1"><span><b>Começar do zero</b><span class="mut" style="display:block;font-weight:400;font-size:12.5px">Com as fichas técnicas de serviços e materiais já carregadas como modelo. Os preços você define.</span></span></button></div>
   <div id="au-pastebox" hidden class="field"><label for="au-bk">Cole o backup</label><textarea id="au-bk" style="min-height:120px;font-family:var(--f-mono);font-size:12px"></textarea><button class="btn primary" id="au-bkgo" style="margin-top:8px">Usar este backup</button></div>`);
   const box=$('auth');if(local)box.querySelector('[data-local]').addEventListener('click',()=>res(JSON.parse(JSON.stringify(local))));
   box.querySelector('[data-zero]').addEventListener('click',()=>res(null));box.querySelector('[data-paste]').addEventListener('click',()=>{$('au-pastebox').hidden=false;$('au-bk').focus()});
@@ -239,7 +239,7 @@ async function refreshIfNewer(){if(!S||!C.lab||C.inflight||!$('modal').hidden)re
   S=merge(docs);migrate();applyUsers();Object.keys(AREAS).forEach(a=>C.sent[a]=J(split()[a]));audSnap=audTake();render();setStatus('ok')}
 /* ---------- barra lateral, equipe e acessos ---------- */
 function bar(){const side=document.querySelector('.side');let el=$('cloudbar');if(!el){el=document.createElement('div');el.id='cloudbar';el.className='cloudbar';side.insertBefore(el,side.querySelector('.nav'))}
-  el.innerHTML=`${C.lab.plan==='teste'?'<span class="test-pill">Ambiente de teste</span>':''}<span class="st" id="cl-st"></span><span>${h(C.lab.name)} · ${h(C.user.email)}</span><span style="display:flex;gap:10px;flex-wrap:wrap">${C.role==='dono'?'<button class="lk" data-cl="hist">Histórico</button>':''}<button class="lk" data-cl="labs">${C.admin?'Gestão CERIONE':'Trocar'}</button><button class="lk" data-cl="out">Sair</button></span>`;
+  el.innerHTML=`${C.lab.plan==='teste'?'<span class="test-pill">Ambiente de teste</span>':''}<span class="st" id="cl-st"></span><span class="cb-who">${h(C.lab.name)} · ${h(C.user.email)}</span><span style="display:flex;gap:10px;flex-wrap:wrap">${C.role==='dono'?'<button class="lk" data-cl="hist">Histórico</button>':''}<button class="lk" data-cl="labs">${C.admin?'Gestão CERIONE':'Trocar'}</button><button class="lk" data-cl="out">Sair</button></span>`;
   setStatus(C.st&&!C.st.can_write?'ro':C.lastOk?'ok':'idle')}
 const roleSel=(id,v)=>`<select id="${id}">${Object.entries(ROLES).map(([k,r])=>`<option value="${k}" ${k===v?'selected':''}>${h(r.n)}</option>`).join('')}</select>`;
 /* substitui a gestão local de usuários (PIN) pela equipe do servidor */
