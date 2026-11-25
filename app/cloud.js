@@ -426,7 +426,7 @@ C.boot=function(){if(!window.supabase||!CFG.url){screen('<div class="msg err">Co
     if(error){let m=error.message||'erro',d=null;try{const j=await error.context.json();m=j.error||m;d=j.detail||null}catch(e){}const er=new Error(m);if(d)er.detail=d;throw er}return data||{}};
   window.WA_API={online:true,
     async cfg(){const{data,error}=await C.sb.rpc('wa_get',{p_lab:C.lab.id});if(error)throw error;return data||{status:'desconectado'}},
-    status:()=>waCall('status'),connect:()=>waCall('connect'),logout:()=>waCall('logout'),hook:()=>waCall('hook'),
+    status:()=>waCall('status'),connect:()=>waCall('connect'),logout:()=>waCall('logout'),hook:()=>waCall('hook'),restart:()=>waCall('restart'),
     async aiMonth(){const{data,error}=await C.sb.rpc('wa_ai_month',{p_lab:C.lab.id});if(error)throw error;return +data||0},
     send:m=>waCall('send',m),sendDoc:m=>waCall('send_doc',m),
     async setAuto(auto){const{error}=await C.sb.rpc('wa_set_auto',{p_lab:C.lab.id,p_auto:auto});if(error)throw error},
