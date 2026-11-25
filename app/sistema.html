@@ -1112,13 +1112,13 @@ function techSelect(o,st){
   return`<select data-act="assign" data-id="${o.id}" data-st="${st}" aria-label="Responsável pela etapa">${c.map(opt).join('')}${oth.length?`<optgroup label="Outros">${oth.map(opt).join('')}</optgroup>`:''}</select>`;
 }
 V.producao=()=>{
-  const act=S.orders.filter(o=>o.status==='producao'&&mine(o)&&(!UI.prodTech||defaultTech(o,curStage(o))===UI.prodTech));
-  const recent=S.orders.filter(o=>!o.parent&&o.status==='entregue'&&mine(o)&&daysTo(o.delivered)>=-5).sort((a,b)=>b.delivered.localeCompare(a.delivered));
+  const act=S.orders.filter(o=>o.status==='producao'&&mine(o)&&(!UI.prodTech||defaultTech(o,curStage(o))===UI.prodTech)&&secOk(o));
+  const recent=S.orders.filter(o=>!o.parent&&o.status==='entregue'&&mine(o)&&secOk(o)&&daysTo(o.delivered)>=-5).sort((a,b)=>b.delivered.localeCompare(a.delivered));
   const card=o=>{const st=curStage(o);return`<article class="card ${isLate(o)?'is-late':''}"><div class="top"><button class="linkbtn" data-act="open" data-id="${o.id}">OS ${o.num}</button>${pill(o)}</div>
     <div class="svc">${esc(svcOf(o).name)}${o.remake?' <span class="chip warn">Retrabalho</span>':''}</div>${kidsTxt(o)?`<div class="mut" style="font-size:12px">+ ${esc(kidsTxt(o))}</div>`:''}<div class="meta"><span>${esc(cliOf(o.client).name)}</span><span class="teeth">${teethTxt(o)}</span><span class="shade">${esc(o.shade)}</span>${boxOf(o)?`<span class="chip" title="Caixa">cx ${esc(boxOf(o))}</span>`:''}${psiOf(o).length?`<span class="chip" title="Sobre implante: ${psiOf(o).join(' ')}">PSI ${psiOf(o).length}</span>`:''}${pendRet(o).length?`<span class="chip warn" title="${esc(pendRet(o).map(rcvName).join(', '))}">devolver ${pendRet(o).length}</span>`:''}</div>
     <div class="act">${myTech()?`<span class="mut" style="font-size:12.5px">${myStage(o)?'Com você':esc(techOf(defaultTech(o,st)).name)}</span>`:techSelect(o,st)}${o.prova?'<span class="chip">Com o dentista</span>':myStage(o)?`<button class="btn sm primary" data-act="adv" data-id="${o.id}">Concluir</button>`:''}</div></article>`};
   return head(myTech()?'Minha produção':'Produção',myTech()?`Os trabalhos que estão com você, ${esc(curUser().name)}, e os que você já fez. Ao concluir, o trabalho segue para a próxima etapa.`:'Cada coluna é uma etapa. Ao concluir, o trabalho segue para a próxima etapa e a comissão de quem executou é registrada.',
-    '<button class="btn" data-act="scan">Ler QR</button>'+(can('os')||!myTech()?''+(can('valores')?'<button class="btn" data-act="bench-all">Fichas do dentista</button>':'')+'<button class="btn" data-act="qr-all">Etiquetas QR</button>':'')+(myTech()?'':sel('ui-prodTech',[['','Toda a equipe'],...S.team.map(t=>[t.id,t.name])],UI.prodTech,'data-ui="prodTech" aria-label="Filtrar por profissional" style="width:auto"')+(can('os')?'<button class="btn primary" data-act="new">+ Novo trabalho</button>':'')))+
+    '<button class="btn" data-act="scan">Ler QR</button>'+(can('os')||!myTech()?''+(can('valores')?'<button class="btn" data-act="bench-all">Fichas do dentista</button>':'')+'<button class="btn" data-act="qr-all">Etiquetas QR</button>':'')+(myTech()?'':sel('ui-prodTech',[['','Toda a equipe'],...S.team.map(t=>[t.id,t.name])],UI.prodTech,'data-ui="prodTech" aria-label="Filtrar por profissional" style="width:auto"')+(can('os')?'<button class="btn primary" data-act="new">+ Novo trabalho</button>':'')))+secBar()+
   `<div class="board-wrap"><div class="board">${STAGES.filter(s=>act.some(o=>curStage(o)===s.id)||S.services.some(v=>v.stages.includes(s.id))).map(s=>{const os=act.filter(o=>curStage(o)===s.id).sort((a,b)=>a.due.localeCompare(b.due));return`<section class="col" aria-label="${s.n}"><div class="col-head"><b>${s.n}</b><span>${os.length} · ${os.reduce((a,o)=>a+q(o),0)} el</span></div>${os.map(card).join('')||'<p class="empty">Nada nesta etapa</p>'}</section>`}).join('')}
   <section class="col"><div class="col-head"><b>Entregues · 5 dias</b><span>${recent.length}</span></div>${recent.map(o=>`<article class="card"><div class="top"><button class="linkbtn" data-act="open" data-id="${o.id}">OS ${o.num}</button>${pill(o)}</div><div class="svc">${esc(svcOf(o).name)}</div><div class="meta"><span>${esc(cliOf(o.client).name)}</span></div></article>`).join('')||'<p class="empty">Nenhuma entrega recente</p>'}</section></div></div>`;
 };
@@ -4794,6 +4794,24 @@ document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.classList&&d.cla
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-cxgo]');if(!b)return;e.preventDefault();const k=b.dataset.cxgo;
   if(k==='rec'){UI.recDe=b.dataset.de||'';UI.recAte=b.dataset.ate||'';UI.recTab='aberto';UI.recQ='';view='receber'}else{UI.payDe=b.dataset.de||'';UI.payAte=b.dataset.ate||'';UI.payTab='aberto';UI.payQ='';UI.payGrp='';view='pagar'}
   try{location.hash=view}catch(x){}render();toast('Mesmo período: '+perTxt(k==='rec'?'rec':'pay'))});
+
+/* Setor da produção (Digital, Acrílico, Cerâmico): cada serviço tem um setor (s.sector), escolhido no cadastro do serviço
+   ou deduzido da categoria. Na Produção, botões no topo filtram o quadro por setor. */
+const SECTORS=[['digital','Digital'],['acrilico','Acrílico'],['ceramico','Cerâmico']];
+const secAuto=s=>{const c=String((s&&s.cat)||'');return/acr[ií]l/i.test(c)?'acrilico':/cer[aâ]m/i.test(c)?'ceramico':/digital/i.test(c)?'digital':''};
+const secOf=s=>!s?'':s.sector==='none'?'':SECTORS.some(x=>x[0]===s.sector)?s.sector:secAuto(s);
+const secName=k=>(SECTORS.find(x=>x[0]===k)||[,''])[1];
+const secOk=o=>!UI.prodSec||(UI.prodSec==='sem'?!secOf(svcOf(o)):secOf(svcOf(o))===UI.prodSec);
+function secBar(){if(UI.prodSec==null)UI.prodSec='';
+  const L=S.orders.filter(o=>o.status==='producao'&&mine(o)&&(!UI.prodTech||defaultTech(o,curStage(o))===UI.prodTech)),n=k=>L.filter(o=>k==='sem'?!secOf(svcOf(o)):secOf(svcOf(o))===k).length,sem=n('sem');
+  return`<div class="toolbar sec-bar" style="margin:0 0 12px"><span class="mut" style="font-size:13px">Setor</span>${seg('prodSec',[['',`Todos (${L.length})`],...SECTORS.map(([k,l])=>[k,`${l} (${n(k)})`]),...(sem||UI.prodSec==='sem'?[['sem',`Sem setor (${sem})`]]:[])])}</div>`}
+/* cadastro do serviço: escolher o setor */
+{const _rs=renderSvc;window.renderSvc=renderSvc=function(...a){const r=_rs(...a);try{const s=svcDraft;if(!s)return r;const old=document.getElementById('sv-sec-f');if(old)old.remove();
+  const c=document.getElementById('sv-cat'),f=c&&c.closest('.field');if(!f)return r;const au=secAuto(s),v=s.sector==='none'?'none':SECTORS.some(x=>x[0]===s.sector)?s.sector:'';
+  f.insertAdjacentHTML('afterend',`<div class="field" id="sv-sec-f"><label for="sv-sec">Setor da produção</label><select id="sv-sec" data-svsec="1"><option value="" ${v===''?'selected':''}>Pela categoria${au?' ('+secName(au)+')':' (nenhum)'}</option>${SECTORS.map(([k,l])=>`<option value="${k}" ${v===k?'selected':''}>${l}</option>`).join('')}<option value="none" ${v==='none'?'selected':''}>Nenhum setor</option></select></div>`)}catch(e){console.error(e)}return r}}
+document.addEventListener('change',e=>{const t=e.target;if(!t||t.id!=='sv-sec'||!svcDraft)return;if(t.value)svcDraft.sector=t.value;else delete svcDraft.sector});
+/* a categoria muda o "Pela categoria (…)" */
+document.addEventListener('input',e=>{const t=e.target;if(!t||t.id!=='sv-cat'||!svcDraft)return;const o=document.querySelector('#sv-sec option[value=""]');if(o){const au=secAuto({cat:t.value});o.textContent='Pela categoria'+(au?' ('+secName(au)+')':' (nenhum)')}});
 
 window.__bootLocal=function(){
 load();migrateStages();try{CUR=sessionStorage.getItem(UKEY)}catch(e){}
